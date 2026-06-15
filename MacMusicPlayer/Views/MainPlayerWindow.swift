@@ -66,6 +66,15 @@ class MainPlayerWindow: NSWindow {
         zoom(sender)
     }
 
+    /// Green button calls zoom: — post notifications to hide/show artwork during animation.
+    override func zoom(_ sender: Any?) {
+        NotificationCenter.default.post(name: .windowWillZoom, object: nil)
+        super.zoom(sender)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            NotificationCenter.default.post(name: .windowDidZoom, object: nil)
+        }
+    }
+
     /// Update the SwiftUI content without replacing the hosting view (preserves glass background).
     func updateContent(_ view: some View) {
         hostingView.rootView = AnyView(view.environment(\.colorScheme, .dark))
@@ -90,4 +99,9 @@ extension MainPlayerWindow {
         NSApp.activate(ignoringOtherApps: true)
         return window
     }
+}
+
+extension Notification.Name {
+    static let windowWillZoom = Notification.Name("MainPlayerWindowWillZoom")
+    static let windowDidZoom = Notification.Name("MainPlayerWindowDidZoom")
 }

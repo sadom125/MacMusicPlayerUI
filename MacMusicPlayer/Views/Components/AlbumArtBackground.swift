@@ -3,6 +3,8 @@
 //  MacMusicPlayer
 //
 //  Full-bleed album art background with breathing glow.
+//  Destroys artwork during window zoom to avoid layout glitch,
+//  then recreates at the correct maximized size.
 //
 
 import SwiftUI
@@ -13,12 +15,16 @@ struct AlbumArtBackground: View {
     var isAnimating: Bool = false
 
     @State private var breathe: Bool = false
+    /// When true, artwork is completely removed (not just hidden)
+    /// so SwiftUI destroys the Image view. After zoom completes,
+    /// it's recreated at the correct size.
+    @State private var artworkDestroyed: Bool = false
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Album art
-                if let data = artworkData, let nsImage = NSImage(data: data) {
+                // Album art — destroyed during zoom, recreated after
+                if !artworkDestroyed, let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .interpolation(.high)
@@ -28,11 +34,11 @@ struct AlbumArtBackground: View {
                         .opacity(0.5)
                         .transition(.opacity)
                 } else {
-                    Color.clear.transition(.opacity)
+                    Color.clear
                 }
 
                 // Breathing glow overlay
-                if artworkData != nil {
+                if !artworkDestroyed, artworkData != nil {
                     Circle()
                         .fill(
                             RadialGradient(
@@ -73,6 +79,14 @@ struct AlbumArtBackground: View {
             withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) {
                 breathe = true
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .windowWillZoom)) { _ in
+            // Destroy artwork BEFORE zoom animation starts
+            artworkDestroyed = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .windowDidZoom)) { _ in
+            // Recreate artwork after zoom animation completes
+            artworkDestroyed = false
         }
     }
 }
