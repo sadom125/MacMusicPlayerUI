@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeIconSystemGenerated</key>
+			<integer>0</integer>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+		</dict>
+	</array>
+	<key>NSServices</key>
+	<array>
+		<dict/>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+    <key>NSPowerManagementUsageDescription</key>
+    <string>${PRODUCT_NAME} needs permission to prevent system sleep to ensure uninterrupted music playback.</string>
+    <key>LSBackgroundOnly</key>
+    <false/>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>LSUIElement</key>
+    <false/>
+    <key>CFBundleIdentifier</key>
+    <string>com.seimotech.MacMusicPlayer</string>
+    <key>SMPrivilegedExecutables</key>
+    <dict>
+        <key>com.seimotech.MacMusicPlayer</key>
+        <string>identifier "com.seimotech.MacMusicPlayer" and anchor apple generic</string>
+    </dict>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+</dict>
+</plist>

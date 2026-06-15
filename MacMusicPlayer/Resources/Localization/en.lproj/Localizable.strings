@@ -1,0 +1,178 @@
+// Menu Items
+"No Music Source" = "No Music Selected";
+"Play" = "Play";
+"Pause" = "Pause";
+"Previous" = "Previous Track";
+"Next" = "Next Track";
+"Playback Mode" = "Playback Mode";
+"Sequential" = "Play in Order";
+"Single Loop" = "Repeat One";
+"Random" = "Shuffle";
+"Set Music Source" = "Choose Music Folder";
+"Download Music" = "Download Music";
+"Browse Songs" = "Browse Songs";
+"Prevent Mac Sleep" = "Keep Mac Awake";
+"Launch at Login" = "Start at Login";
+"Settings" = "Settings";
+"Quit" = "Quit";
+"Feeling Lucky" = "Feeling Lucky";
+
+// Music Library
+"Music Libraries" = "Music Libraries";
+"Add New Library" = "Add New Library";
+"Delete Current Library" = "Delete Current Library";
+"Rename Current Library" = "Rename Current Library";
+"My Music" = "My Music";
+"Confirm Deletion" = "Confirm Deletion";
+"This operation will not delete music files on disk, it only removes this library from the app." = "This operation will not delete music files on disk, it only removes this library from the app.";
+"Delete" = "Delete";
+"Cancel" = "Cancel";
+"Rename Library" = "Rename Library";
+"Please enter a new name for the library:" = "Please enter a new name for the library:";
+"OK" = "OK";
+"Refresh Current Library" = "Refresh Current Library";
+
+// Dialog
+"Select Music Folder" = "Choose Music Folder";
+"Unknown Artist" = "Unknown Artist";
+
+// Notifications
+"Started playing" = "Now Playing";
+"Paused playback" = "Playback Paused";
+"No current track to play" = "No Music to Play";
+"Error accessing Music folder" = "Cannot Access Music Folder";
+"Could not create player" = "Cannot Initialize Player";
+
+// System
+"Enable launch at login" = "Start at Login Enabled";
+"Disable launch at login" = "Start at Login Disabled";
+"MacMusicPlayer needs permission to prevent system sleep to ensure uninterrupted music playback." = "MacMusicPlayer needs permission to keep your Mac awake for uninterrupted music playback."; 
+"Version %@ (%@)" = "Version %@ (%@)"; 
+
+// Download Manager
+"Failed to get available formats" = "Failed to get available formats";
+"Download failed: %@" = "Download failed: %@";
+"Invalid URL" = "Invalid URL";
+"yt-dlp not found, please make sure it's installed (brew install yt-dlp)" = "yt-dlp not found, please make sure it's installed (brew install yt-dlp)";
+"ffmpeg not found, please make sure it's installed (brew install ffmpeg)" = "ffmpeg not found, please make sure it's installed (brew install ffmpeg)";
+"Failed to get video title" = "Failed to get video title";
+"Failed to get playlist information" = "Failed to get playlist information";
+"Playlist download failed: %@" = "Playlist download failed: %@";
+"Found ffmpeg path: %@" = "Found ffmpeg path: %@";
+"Error checking ffmpeg: %@" = "Error checking ffmpeg: %@";
+"Found yt-dlp path: %@" = "Found yt-dlp path: %@";
+"Error checking yt-dlp: %@" = "Error checking yt-dlp: %@";
+"Error getting video title: %@" = "Error getting video title: %@";
+"Getting available formats, URL: %@" = "Getting available formats, URL: %@";
+"Best Quality (Auto Select)" = "Best Quality (Auto Select)";
+"stereo" = "stereo";
+"mono" = "mono";
+"5.1 channels" = "5.1 channels";
+"%@ Audio (%@" = "%@ Audio (%@";
+"%@ Audio" = "%@ Audio";
+"M4A Audio (128kbps, 44kHz, stereo, 3.5MiB) [AAC]" = "M4A Audio (128kbps, 44kHz, stereo, 3.5MiB) [AAC]";
+"WebM Audio (160kbps, 48kHz, stereo, 3.2MiB) [Opus]" = "WebM Audio (160kbps, 48kHz, stereo, 3.2MiB) [Opus]";
+"Failed to get formats: %@" = "Failed to get formats: %@";
+"Error getting formats: %@" = "Error getting formats: %@";
+"Starting audio download, URL: %@, Format ID: %@" = "Starting audio download, URL: %@, Format ID: %@";
+"Getting playlist information, URL: %@" = "Getting playlist information, URL: %@";
+"Starting playlist download, URL: %@" = "Starting playlist download, URL: %@";
+"Successfully downloaded: %@" = "Successfully downloaded: %@";
+"Failed to download: %@ - Error: %@" = "Failed to download: %@ - Error: %@";
+"Completed" = "Completed";
+"All downloads failed" = "All downloads failed";
+"Playlist download completed: %d successful, %d failed" = "Playlist download completed: %d successful, %d failed";
+"Video title: %@" = "Video title: %@";
+"Downloading to file: %@" = "Downloading to file: %@";
+"Executing download command..." = "Executing download command...";
+"Download output: %@" = "Download output: %@";
+"Download error output: %@" = "Download error output: %@";
+"Waiting for download to complete..." = "Waiting for download to complete...";
+"Download successful" = "Download successful";
+"Download failed, exit status: %d" = "Download failed, exit status: %d";
+"Error during download: %@" = "Error during download: %@";
+
+// New UI Strings
+"Not installed" = "Not installed";
+"Installed" = "Installed";
+"Please install missing dependencies" = "Please install missing dependencies";
+"Please select a format to download" = "Please select a format to download";
+"Enter video URL" = "Enter video URL";
+"Detect" = "Detect";
+"Download" = "Download"; 
+
+// Search UI Strings
+"Enter video URL or search keyword" = "Enter video URL or search keyword";
+"Search" = "Search";
+"Please enter a URL or search keyword" = "Please enter a URL or search keyword";
+"Searching..." = "Searching...";
+"Load more results..." = "Load more results...";
+"No results found" = "No results found";
+"Search Error: %@" = "Search Error: %@";
+"Search error: API configuration not completed, please set API URL and API Key" = "Search error: API configuration not completed, please set API URL and API Key";
+"Search error: Invalid API URL, please check the configuration" = "Search error: Invalid API URL, please check the configuration";
+"Search error: API authentication failed, please check the API Key" = "Search error: API authentication failed, please check the API Key";
+"Search error: Server error, please try again later" = "Search error: Server error, please try again later";
+"Copy error" = "Copy error";
+"Copied to clipboard" = "Copied to clipboard";
+"Please configure the search service API (API URL and API Key)" = "Please configure the search service API (API URL and API Key)";
+"Go to settings" = "Go to settings";
+"View more" = "View more";
+"Found %d results" = "Found %d results";
+"Details" = "Details";
+"Load Playlist" = "Load Playlist";
+"Download All" = "Download All";
+"Download %d" = "Download %d";
+"Download Selected" = "Download Selected";
+"Stop" = "Stop";
+"Download stopped" = "Download stopped";
+
+// Download Format UI Strings
+"Please enter a valid URL" = "Please enter a valid URL";
+"Detecting available formats..." = "Detecting available formats...";
+"Found %d available formats" = "Found %d available formats";
+"No formats found" = "No formats found";
+"Error: %@" = "Error: %@";
+"Starting download..." = "Starting download...";
+"Download completed successfully" = "Download completed successfully";
+"Information" = "Information";
+"Loading formats..." = "Loading formats...";
+"Downloading %@..." = "Downloading %@...";
+"Download completed" = "Download completed";
+"Please enter a valid playlist URL" = "Please enter a valid playlist URL";
+"Loading playlist information..." = "Loading playlist information...";
+"Playlist: %@ (%d items)" = "Playlist: %@ (%d items)";
+"Playlist is empty" = "Playlist is empty";
+"Failed to load playlist: %@" = "Failed to load playlist: %@";
+"Starting playlist download..." = "Starting playlist download...";
+"Starting selected downloads..." = "Starting selected downloads...";
+"Downloading (%d/%d) - %@" = "Downloading (%d/%d) - %@";
+"Playlist download completed" = "Playlist download completed";
+"Selected downloads completed" = "Selected downloads completed";
+"Playlist download failed: %@" = "Playlist download failed: %@";
+"Selected downloads failed: %@" = "Selected downloads failed: %@";
+
+// Song Picker Window Status
+"search_songs_placeholder" = "Search songs...";
+"song_count_format" = "%d Song";
+"operation_hints" = "Tab to switch, Enter to play, Esc to close";
+
+// Configuration Settings
+"API Key:" = "API Key:";
+"Enter API Key" = "Enter API Key";
+"API URL:" = "API URL:";
+"Enter API URL" = "Enter API URL";
+"Save" = "Save";
+"Please enter API Key" = "Please enter API Key";
+"Please enter API URL" = "Please enter API URL";
+"Configuration saved" = "Configuration saved";
+"Show song picker on launch" = "Show song picker on launch";
+
+// API Error Messages
+"API configuration not completed" = "API configuration not completed";
+"API URL not configured" = "API URL not configured";
+"No data received" = "No data received";
+"Server Error: %@" = "Server Error: %@";
+"Reset" = "Reset";
+"Reset to defaults" = "Reset to defaults";
+"API URL is invalid" = "API URL is invalid";
