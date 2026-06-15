@@ -30,24 +30,14 @@ struct MiniPlayerView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // Solid dark base — no gradient edge artifacts
+            // SwiftUI material — follows rounded corners automatically
             Rectangle()
-                .fill(Color(red: 0.031, green: 0.031, blue: 0.055))
+                .fill(.ultraThinMaterial)
                 .allowsHitTesting(false)
 
-            // Glass sheen — semi-transparent overlay for depth (contained inside clip, no edge artifact)
+            // Dark tint overlay for depth — light enough for glass to show through
             Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.06),
-                            Color.white.opacity(0.02),
-                            Color.clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0.35))
                 .allowsHitTesting(false)
 
             VStack(spacing: 0) {
@@ -155,20 +145,6 @@ struct MiniPlayerView: View {
                 .padding(.vertical, 10)
             }
 
-            // Top edge fade — smooths transition from clear window to dark card
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0),
-                            Color(red: 0.031, green: 0.031, blue: 0.055)
-                        ],
-                        startPoint: .top,
-                        endPoint: .init(x: 0, y: 1)
-                    )
-                )
-                .frame(height: 10)
-                .allowsHitTesting(false)
         }
         .frame(width: 300, height: 150)
         .clipShape(RoundedRectangle(cornerRadius: 14))
