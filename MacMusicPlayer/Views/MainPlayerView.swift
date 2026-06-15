@@ -218,6 +218,17 @@ struct MainPlayerView: View {
             }
         }
 
+        // 2b. Direct synchronous scan of raw FLAC Vorbis comments for LYRICS tag
+        if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
+        if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
+            let parsed = LrcParser.parse(lrcText: lrcText)
+            if !parsed.isEmpty {
+                lyrics = parsed
+                currentLyricIndex = 0
+                return
+            }
+        }
+
         // 3. Fallback: show track info
         var fallbackLines: [LyricLine] = []
         fallbackLines.append(LyricLine(time: 0, text: track.title))

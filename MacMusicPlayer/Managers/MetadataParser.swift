@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 
 /// Parses audio file metadata using AVAsset.
-/// Extracts title, artist, album, artwork image, and duration from embedded ID3 tags.
+/// Extracts title, artist, album, artwork image, duration, and lyrics from embedded tags.
 struct MetadataParser {
 
     struct Metadata {
@@ -94,6 +94,36 @@ struct MetadataParser {
         if let item = metadata.first(where: { $0.commonKey?.rawValue == "lyrics" }),
            let value = item.value as? String, !value.isEmpty {
             return value
+        }
+        return nil
+    }
+
+    /// Synchronously read LYRICS tag from a FLAC file by scanning raw Vorbis comments.
+    /// Used as a direct fallback when async AVAsset metadata is not yet available.
+    static func parseLyricsDirect(from url: URL) -> String? {
+        guard url.pathExtension.lowercased() == "flac" else { return nil }
+        guard let fileHandle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? fileHandle.close() }
+
+        guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int else { return nil }
+        let readSize = min(1024 * 512, size)
+        guard let data = try? fileHandle.read(upToCount: readSize), data.count > 42 else { return nil }
+
+        // Search for "LYRICS=" in raw bytes (Vorbis comment stores as field=value)
+        let pattern = "LYRICS=".data(using: .utf8)!
+        var searchStart = 0
+        while searchStart <= data.count - pattern.count {
+            if data[searchStart..<searchStart + pattern.count] == pattern {
+                let start = searchStart + pattern.count
+                var end = start
+                while end < data.count, data[end] != 0 {
+                    end += 1
+                }
+                if end > start {
+                    return String(data: data[start..<end], encoding: .utf8)
+                }
+            }
+            searchStart += 1
         }
         return nil
     }

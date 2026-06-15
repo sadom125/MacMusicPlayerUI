@@ -292,21 +292,24 @@ class PlayerManager: NSObject, ObservableObject {
             url: old.url,
             lyrics: meta.lyrics
         )
-        playlist[idx] = updated
 
-        // Also update in playlistStore
-        if let storeIdx = playlistStore.tracks.firstIndex(where: { $0.id == trackID }) {
-            var storeTracks = playlistStore.tracks
-            storeTracks[storeIdx] = updated
-            playlistStore.setTracks(storeTracks)
-        }
+        DispatchQueue.main.async { [self] in
+            playlist[idx] = updated
 
-        // If this is the current track, update it
-        if currentTrack?.id == trackID {
-            currentTrack = updated
-            duration = meta.duration
-            if isPlaying {
-                updateNowPlayingInfo()
+            // Also update in playlistStore
+            if let storeIdx = playlistStore.tracks.firstIndex(where: { $0.id == trackID }) {
+                var storeTracks = playlistStore.tracks
+                storeTracks[storeIdx] = updated
+                playlistStore.setTracks(storeTracks)
+            }
+
+            // If this is the current track, update it
+            if currentTrack?.id == trackID {
+                currentTrack = updated
+                duration = meta.duration
+                if isPlaying {
+                    updateNowPlayingInfo()
+                }
             }
         }
     }
