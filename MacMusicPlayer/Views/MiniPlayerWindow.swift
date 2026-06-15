@@ -14,15 +14,13 @@ class MiniPlayerWindow: NSPanel {
 
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 130),
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
         self.isFloatingPanel = true
         self.level = .floating
-        self.titleVisibility = .hidden
-        self.titlebarAppearsTransparent = true
         self.isMovableByWindowBackground = true
         self.isOpaque = true
         self.backgroundColor = NSColor(red: 0.031, green: 0.031, blue: 0.055, alpha: 1)

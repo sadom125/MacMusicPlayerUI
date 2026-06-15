@@ -142,17 +142,14 @@ struct MiniPlayerView: View {
             .padding(.vertical, 8)
         }
         .background(
-            Color.black.opacity(0.85)
-        )
-        .background(
-            VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow)
+            Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0.92)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 8)
+        .shadow(color: .black.opacity(0.6), radius: 24, x: 0, y: 10)
         .frame(width: 300)
         .onTapGesture(count: 2) {
             returnToFullPlayer()
@@ -214,17 +211,5 @@ struct MiniPlayerView: View {
 }
 
 /// Bridge NSVisualEffectView for SwiftUI
-struct VisualEffectBackground: NSViewRepresentable {
-    let material: NSVisualEffectView.Material
-    let blendingMode: NSVisualEffectView.BlendingMode
 
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.material = material
-        v.blendingMode = blendingMode
-        v.state = .active
-        return v
-    }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
-}
