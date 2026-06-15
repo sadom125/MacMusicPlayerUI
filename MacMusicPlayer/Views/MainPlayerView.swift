@@ -126,28 +126,36 @@ struct MainPlayerView: View {
         }
     }
 
-    /// Switch to mini player by swapping the window's content view
+    /// Switch to mini player with smooth animation
     private func switchToMiniPlayer() {
-        guard let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else { return }
-        let miniView = MiniPlayerView(player: player)
-            .environment(\.colorScheme, .dark)
-        let hosting = NSHostingView(rootView: AnyView(miniView))
-        hosting.frame = window.contentView?.bounds ?? .zero
-        hosting.autoresizingMask = [.width, .height]
+        guard let fullWindow = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else { return }
+        let sourceFrame = fullWindow.frame
 
-        window.titleVisibility = .hidden
-        window.styleMask = [.titled, .nonactivatingPanel, .fullSizeContentView]
-        window.isMovableByWindowBackground = true
-        window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.contentView = hosting
+        // Create mini player without showing it yet
+        let miniWindow = MiniPlayerWindow.show(playerManager: player, showWindow: false)
+        (NSApplication.shared.delegate as? AppDelegate)?.miniPlayerWindow = miniWindow
+        miniWindow.delegate = NSApplication.shared.delegate as? NSWindowDelegate
 
-        // Move to bottom-right
-        if let screen = NSScreen.main {
-            let sf = screen.visibleFrame
-            window.setFrame(NSRect(x: sf.maxX - 320, y: sf.minY + 40, width: 300, height: 130), display: true, animate: true)
+        // Target is the top-right position set by MiniPlayerWindow.show
+        let targetFrame = miniWindow.frame
+
+        // Start at full window position, invisible
+        miniWindow.setFrame(sourceFrame, display: false)
+        miniWindow.alphaValue = 0.0
+
+        // Hide full window first, then animate mini in
+        fullWindow.orderOut(nil)
+
+        miniWindow.orderFront(nil)
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.35
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.allowsImplicitAnimation = true
+
+            miniWindow.animator().setFrame(targetFrame, display: true)
+            miniWindow.animator().alphaValue = 1.0
         }
-        window.makeKeyAndOrderFront(nil)
     }
 
     // MARK: - Control Bar

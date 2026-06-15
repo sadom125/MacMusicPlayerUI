@@ -29,128 +29,150 @@ struct MiniPlayerView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Top section: album art + info
-            HStack(spacing: 10) {
-                // Album art thumbnail
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(red: 0.031, green: 0.031, blue: 0.055))
-                        .frame(width: 40, height: 40)
+        ZStack(alignment: .topLeading) {
+            // Solid dark base — no gradient edge artifacts
+            Rectangle()
+                .fill(Color(red: 0.031, green: 0.031, blue: 0.055))
+                .allowsHitTesting(false)
 
-                    if let data = artworkData, let nsImage = NSImage(data: data) {
-                        Image(nsImage: nsImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 40, height: 40)
-                            .clipped()
+            // Glass sheen — semi-transparent overlay for depth (contained inside clip, no edge artifact)
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.06),
+                            Color.white.opacity(0.02),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .allowsHitTesting(false)
+
+            VStack(spacing: 0) {
+                // Top section: album art + info
+                HStack(spacing: 10) {
+                    // Album art thumbnail
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(red: 0.031, green: 0.031, blue: 0.055))
+                            .frame(width: 44, height: 44)
+
+                        if let data = artworkData, let nsImage = NSImage(data: data) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 44, height: 44)
+                                .clipped()
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    // Track info
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(player.currentTrack?.title ?? "No track")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .lineLimit(1)
+                        Text(player.currentTrack?.artist ?? "")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color.tnAccent)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    // Return to full player button
+                    Button(action: returnToFullPlayer) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                            .frame(width: 26, height: 26)
+                            .background(Color.white.opacity(0.04))
+                            .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Return to full player")
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 6)
+
+                // Current lyric line
+                Text(currentLyricText)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.45))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 8)
+
+                // Thin progress bar
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.03))
+                            .frame(height: 2)
+                        Rectangle()
+                            .fill(Color.tnAccent.opacity(0.4))
+                            .frame(
+                                width: geo.size.width * progressRatio,
+                                height: 2
+                            )
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                .frame(height: 2)
+
+                // Controls — larger touch targets
+                HStack(spacing: 20) {
+                    Button(action: { player.playPrevious() }) {
+                        Image(systemName: "backward.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: { player.isPlaying ? player.pause() : player.play() }) {
+                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color.tnAccent)
+                            .frame(width: 48, height: 48)
+                            .background(Color.tnAccent.opacity(0.08))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: { player.playNext() }) {
+                        Image(systemName: "forward.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 10)
+            }
+
+            // Top edge fade — smooths transition from clear window to dark card
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0),
+                            Color(red: 0.031, green: 0.031, blue: 0.055)
+                        ],
+                        startPoint: .top,
+                        endPoint: .init(x: 0, y: 1)
+                    )
                 )
-
-                // Track info
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(player.currentTrack?.title ?? "No track")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(1)
-                    Text(player.currentTrack?.artist ?? "")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color.tnAccent)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 0)
-
-                // Return to full player button
-                Button(action: returnToFullPlayer) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                        .frame(width: 24, height: 24)
-                        .background(Color.white.opacity(0.04))
-                        .cornerRadius(6)
-                }
-                .buttonStyle(.plain)
-                .help("Return to full player")
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 6)
-
-            // Current lyric line
-            Text(currentLyricText)
-                .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.45))
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 8)
-
-            // Thin progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.03))
-                        .frame(height: 2)
-                    Rectangle()
-                        .fill(Color.tnAccent.opacity(0.4))
-                        .frame(
-                            width: geo.size.width * progressRatio,
-                            height: 2
-                        )
-                }
-            }
-            .frame(height: 2)
-
-            // Controls
-            HStack(spacing: 14) {
-                Button(action: { player.playPrevious() }) {
-                    Text("⏮")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.5))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-
-                Button(action: { player.isPlaying ? player.pause() : player.play() }) {
-                    Text(player.isPlaying ? "⏸" : "▶")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color.tnAccent)
-                        .frame(width: 36, height: 36)
-                        .background(Color.tnAccent.opacity(0.06))
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(Color.tnAccent.opacity(0.08), lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-
-                Button(action: { player.playNext() }) {
-                    Text("⏭")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.5))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.vertical, 8)
+                .frame(height: 10)
+                .allowsHitTesting(false)
         }
-        .background(
-            Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0.92)
-        )
+        .frame(width: 300, height: 150)
         .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.6), radius: 24, x: 0, y: 10)
-        .frame(width: 300)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .onTapGesture(count: 2) {
             returnToFullPlayer()
         }
@@ -186,27 +208,53 @@ struct MiniPlayerView: View {
     }
 
     private func returnToFullPlayer() {
+        // Get mini player window frame for animation start point
+        guard let miniPanel = NSApplication.shared.windows.first(where: { $0 is MiniPlayerWindow }) else { return }
+        let miniFrame = miniPanel.frame
+
         guard let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else {
-            // Fallback
             (NSApplication.shared.delegate as? AppDelegate)?.showMainWindow()
             return
         }
+
         let fullView = MainPlayerView(player: player)
             .environment(\.colorScheme, .dark)
         let hosting = NSHostingView(rootView: AnyView(fullView))
         hosting.frame = window.contentView?.bounds ?? .zero
         hosting.autoresizingMask = [.width, .height]
 
+        // Configure full window style
         window.titleVisibility = .visible
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.isMovableByWindowBackground = false
         window.level = .normal
         window.collectionBehavior = [.canJoinAllSpaces]
         window.contentView = hosting
-        window.setFrame(NSRect(x: 0, y: 0, width: 680, height: 580), display: true, animate: true)
-        window.center()
+
+        // Calculate centered target frame
+        let fullWidth: CGFloat = 680
+        let fullHeight: CGFloat = 580
+        let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let targetX = screenFrame.midX - fullWidth / 2
+        let targetY = screenFrame.midY - fullHeight / 2
+        let targetFrame = NSRect(x: targetX, y: targetY, width: fullWidth, height: fullHeight)
+
+        // Start full window at mini player position/size, then animate to centered target
+        window.setFrame(miniFrame, display: false)
+        window.alphaValue = 0.0
         window.makeKeyAndOrderFront(nil)
         (window as? MainPlayerWindow)?.updateTitle()
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.35
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.allowsImplicitAnimation = true
+
+            window.animator().setFrame(targetFrame, display: true)
+            window.animator().alphaValue = 1.0
+        } completionHandler: {
+            miniPanel.orderOut(nil)
+        }
     }
 }
 

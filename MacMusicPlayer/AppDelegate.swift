@@ -16,7 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var configWindow: NSWindow?
     private var songPickerWindow: SimpleSongPickerWindow?
     private(set) var mainPlayerWindow: MainPlayerWindow?
-    private(set) var miniPlayerWindow: MiniPlayerWindow?
+    var miniPlayerWindow: MiniPlayerWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         playerManager = PlayerManager()
@@ -311,10 +311,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let window = MiniPlayerWindow.show(playerManager: playerManager)
-        window.makeKeyAndOrderFront(nil)
+
+        // Get full player window frame for animation start point
+        let sourceFrame = mainPlayerWindow?.frame
+
+        // Create mini player without showing it yet
+        let window = MiniPlayerWindow.show(playerManager: playerManager, showWindow: false)
         window.delegate = self
         self.miniPlayerWindow = window
+
+        // Target is the top-right position set by MiniPlayerWindow.show
+        let targetFrame = window.frame
+
+        if let sourceFrame = sourceFrame {
+            // Start at full window position, invisible
+            window.setFrame(sourceFrame, display: false)
+            window.alphaValue = 0.0
+
+            // Hide full window first, then animate mini in
+            mainPlayerWindow?.orderOut(nil)
+            window.orderFront(nil)
+
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.35
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                ctx.allowsImplicitAnimation = true
+
+                window.animator().setFrame(targetFrame, display: true)
+                window.animator().alphaValue = 1.0
+            }
+        } else {
+            window.orderFront(nil)
+        }
         NSApp.activate(ignoringOtherApps: true)
     }
 

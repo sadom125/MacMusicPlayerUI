@@ -5,6 +5,9 @@ import AppKit
 class MiniPlayerWindow: NSPanel {
     private let hostingView: NSHostingView<AnyView>
 
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
     init(playerManager: PlayerManager) {
         let contentView = MiniPlayerView(player: playerManager)
             .environment(\.colorScheme, .dark)
@@ -13,7 +16,7 @@ class MiniPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 130),
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 150),
             styleMask: [.nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -22,9 +25,9 @@ class MiniPlayerWindow: NSPanel {
         self.isFloatingPanel = true
         self.level = .floating
         self.isMovableByWindowBackground = true
-        self.isOpaque = true
-        self.backgroundColor = NSColor(red: 0.031, green: 0.031, blue: 0.055, alpha: 1)
-        self.hasShadow = true
+        self.isOpaque = false
+        self.backgroundColor = NSColor(red: 0.031, green: 0.031, blue: 0.055, alpha: 0)
+        self.hasShadow = false
         self.ignoresMouseEvents = false
         self.acceptsMouseMovedEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -32,22 +35,24 @@ class MiniPlayerWindow: NSPanel {
         hosting.frame = self.contentView?.bounds ?? .zero
         hosting.autoresizingMask = [.width, .height]
         self.contentView = hosting
-
-        // Position bottom-right corner
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let windowFrame = self.frame
-            let x = screenFrame.maxX - windowFrame.width - 20
-            let y = screenFrame.minY + 40
-            self.setFrameOrigin(NSPoint(x: x, y: y))
-        }
     }
 }
 
 extension MiniPlayerWindow {
-    static func show(playerManager: PlayerManager) -> MiniPlayerWindow {
+    static func show(playerManager: PlayerManager, showWindow: Bool = true) -> MiniPlayerWindow {
         let window = MiniPlayerWindow(playerManager: playerManager)
-        window.orderFront(nil)
+        // Position top-right corner
+        if let screen = NSScreen.main {
+            let sf = screen.frame
+            let w = window.frame.width
+            let h = window.frame.height
+            let x = sf.maxX - w - 20
+            let y = sf.maxY - h - 20
+            window.setFrame(NSRect(x: x, y: y, width: w, height: h), display: false)
+        }
+        if showWindow {
+            window.orderFront(nil)
+        }
         return window
     }
 }
