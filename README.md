@@ -1,4 +1,4 @@
-# LX Music macOS Client
+# Music macOS Client
 
 <div align="center">
   <br />
@@ -15,8 +15,6 @@
 基于 [samzong/MacMusicPlayer](https://github.com/samzong/MacMusicPlayer) 增量改造的 macOS 原生音乐播放器，专注于**沉浸式歌词体验**。
 
 ## 设计风格
-
-**Dark Immersion** — 纯黑底 `#08080e` + 蓝 accent `#60b0ff` + 紫辅助 `#b388ff`
 
 - 🎵 封面作为全幅背景，底部渐变淡出 + 环境光晕呼吸动画
 - 📝 居中 LRC 滚动歌词，active 行高亮 + `past/near/active` 三层透明度
