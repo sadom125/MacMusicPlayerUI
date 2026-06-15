@@ -13,9 +13,9 @@ struct MainPlayerView: View {
 
     var body: some View {
         ZStack {
-            // Album art background color wash
+            // Album art background
             AlbumArtBackground(
-                accentColor: dominantColor(),
+                artworkData: player.currentTrack?.albumArtData,
                 isAnimating: player.isPlaying
             )
 
@@ -261,55 +261,6 @@ struct MainPlayerView: View {
             currentLyricIndex = idx
         }
     }
-
-    // MARK: - Dominant Color
-
-    /// Returns a color based on the current track's album art, or a fallback blue.
-    private func dominantColor() -> Color {
-        guard let data = player.currentTrack?.albumArtData,
-              let image = NSImage(data: data) else {
-            return Color.tnAccent
-        }
-        return Color(nsColor: averageColor(from: image))
-    }
-
-    private func averageColor(from image: NSImage) -> NSColor {
-        // Simple average color from the image
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return NSColor(red: 0.376, green: 0.690, blue: 1.0, alpha: 1)
-        }
-        let width = min(cgImage.width, 100)
-        let height = min(cgImage.height, 100)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        var pixelData = [UInt8](repeating: 0, count: width * height * 4)
-
-        guard let context = CGContext(
-            data: &pixelData,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: width * 4,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return NSColor(red: 0.376, green: 0.690, blue: 1.0, alpha: 1) }
-
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-
-        var r: UInt64 = 0, g: UInt64 = 0, b: UInt64 = 0
-        let count = width * height
-        for i in 0..<count {
-            let offset = i * 4
-            r += UInt64(pixelData[offset])
-            g += UInt64(pixelData[offset + 1])
-            b += UInt64(pixelData[offset + 2])
-        }
-
-        return NSColor(
-            red: CGFloat(r) / CGFloat(count) / 255,
-            green: CGFloat(g) / CGFloat(count) / 255,
-            blue: CGFloat(b) / CGFloat(count) / 255,
-            alpha: 1
-        )
-    }
 }
+
 

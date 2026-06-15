@@ -1,27 +1,42 @@
 import SwiftUI
 
-/// Full-width background gradient that simulates album art colors bleeding into the dark background.
-/// Takes the dominant color from the album art and creates a smooth fade to pure black.
+/// Full-width album art as background, with bottom fade to black and gentle breathing glow.
 struct AlbumArtBackground: View {
-    let accentColor: Color
+    let artworkData: Data?
     var isAnimating: Bool = false
 
     @State private var breathe: Bool = false
 
     var body: some View {
         ZStack {
-            // Main color wash
-            accentColor
-                .opacity(0.12)
-                .blur(radius: 80)
-                .scaleEffect(breathe ? 1.06 : 1.0)
+            // Album art image as full background (no border, no rounded corners)
+            if let data = artworkData, let nsImage = NSImage(data: data) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipped()
+            } else {
+                // Fallback: pure dark background
+                Color(red: 0.031, green: 0.031, blue: 0.055)
+            }
 
-            // Secondary purple wash
-            accentColor
-                .opacity(0.05)
-                .blur(radius: 120)
-                .offset(x: 30, y: -20)
-                .scaleEffect(breathe ? 1.1 : 1.0)
+            // Ambient glow overlay (breathing animation)
+            if let data = artworkData, let nsImage = NSImage(data: data) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipped()
+                    .blur(radius: 60)
+                    .opacity(0.25)
+                    .scaleEffect(breathe ? 1.04 : 1.0)
+                    .blendMode(.screen)
+            } else {
+                // Fallback accent glow
+                Color.tnAccent
+                    .opacity(0.12)
+                    .blur(radius: 80)
+                    .scaleEffect(breathe ? 1.06 : 1.0)
+            }
 
             // Fade to black at bottom
             LinearGradient(
