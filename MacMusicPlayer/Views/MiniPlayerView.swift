@@ -92,7 +92,7 @@ struct MiniPlayerView: View {
                             .background(Color.white.opacity(0.04))
                             .cornerRadius(6)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
                     .help("Return to full player")
                 }
                 .padding(.horizontal, 14)
@@ -132,7 +132,7 @@ struct MiniPlayerView: View {
                             .foregroundColor(.white.opacity(0.6))
                             .frame(width: 40, height: 40)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
 
                     Button(action: { player.isPlaying ? player.pause() : player.play() }) {
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
@@ -142,7 +142,7 @@ struct MiniPlayerView: View {
                             .background(Color.tnAccent.opacity(0.08))
                             .clipShape(Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
 
                     Button(action: { player.playNext() }) {
                         Image(systemName: "forward.fill")
@@ -150,7 +150,7 @@ struct MiniPlayerView: View {
                             .foregroundColor(.white.opacity(0.6))
                             .frame(width: 40, height: 40)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
                 }
                 .padding(.vertical, 10)
             }

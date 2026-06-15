@@ -204,7 +204,7 @@ struct MainPlayerView: View {
                         )
                         .cornerRadius(8)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
 
                 // Mini player toggle
                 Button(action: switchToMiniPlayer) {
@@ -215,7 +215,7 @@ struct MainPlayerView: View {
                         .background(Color.white.opacity(0.04))
                         .cornerRadius(8)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
                 .help("Switch to mini player")
             }
             .padding(.horizontal, 16)
@@ -253,7 +253,7 @@ struct MainPlayerView: View {
             .background(Color.white.opacity(0.04))
             .cornerRadius(8)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle(scaleDown: 0.9))
     }
 
     private func playModeIcon(_ mode: PlayMode) -> String {
@@ -283,7 +283,7 @@ struct MainPlayerView: View {
                 .background(Color.tnAccent.opacity(0.1))
                 .clipShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
     }
 
     private func controlButton(icon: String, size: CGFloat, action: @escaping () -> Void) -> some View {
@@ -293,7 +293,7 @@ struct MainPlayerView: View {
                 .foregroundColor(.white.opacity(0.6))
                 .frame(width: 36, height: 36)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
     }
 
     // MARK: - Lyrics
