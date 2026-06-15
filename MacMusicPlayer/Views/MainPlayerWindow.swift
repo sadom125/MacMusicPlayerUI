@@ -3,7 +3,7 @@ import AppKit
 
 /// NSWindow container holding the SwiftUI MainPlayerView.
 class MainPlayerWindow: NSWindow {
-    private let hostingView: NSHostingView<AnyView>
+    let hostingView: NSHostingView<AnyView>
     private let playerManager: PlayerManager
 
     init(playerManager: PlayerManager) {
@@ -37,12 +37,29 @@ class MainPlayerWindow: NSWindow {
             // The NSTitlebarView will get the visual effect background automatically
         }
 
-        hosting.frame = self.contentView?.bounds ?? .zero
+        // Glass background — NSVisualEffectView as the window's底层
+        let glassView = NSVisualEffectView()
+        glassView.material = .hudWindow
+        glassView.blendingMode = .behindWindow
+        glassView.state = .active
+        glassView.isEmphasized = false
+        glassView.autoresizingMask = [.width, .height]
+        glassView.frame = self.contentView?.bounds ?? .zero
+
+        // Hosting view sits on top of glass
+        hosting.frame = glassView.bounds
         hosting.autoresizingMask = [.width, .height]
-        self.contentView = hosting
+        glassView.addSubview(hosting)
+
+        self.contentView = glassView
 
         self.center()
         self.acceptsMouseMovedEvents = true
+    }
+
+    /// Update the SwiftUI content without replacing the hosting view (preserves glass background).
+    func updateContent(_ view: some View) {
+        hostingView.rootView = AnyView(view.environment(\.colorScheme, .dark))
     }
 
     /// Update window title to show current track name (white text, no artist).

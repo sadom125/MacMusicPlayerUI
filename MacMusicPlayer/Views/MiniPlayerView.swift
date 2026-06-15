@@ -212,24 +212,20 @@ struct MiniPlayerView: View {
         guard let miniPanel = NSApplication.shared.windows.first(where: { $0 is MiniPlayerWindow }) else { return }
         let miniFrame = miniPanel.frame
 
-        guard let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else {
+        guard let mainWindow = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) as? MainPlayerWindow else {
             (NSApplication.shared.delegate as? AppDelegate)?.showMainWindow()
             return
         }
 
-        let fullView = MainPlayerView(player: player)
-            .environment(\.colorScheme, .dark)
-        let hosting = NSHostingView(rootView: AnyView(fullView))
-        hosting.frame = window.contentView?.bounds ?? .zero
-        hosting.autoresizingMask = [.width, .height]
+        // Reuse the existing hosting view (preserves glass background)
+        mainWindow.updateContent(MainPlayerView(player: player))
 
         // Configure full window style
-        window.titleVisibility = .visible
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        window.isMovableByWindowBackground = false
-        window.level = .normal
-        window.collectionBehavior = [.canJoinAllSpaces]
-        window.contentView = hosting
+        mainWindow.titleVisibility = .visible
+        mainWindow.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        mainWindow.isMovableByWindowBackground = false
+        mainWindow.level = .normal
+        mainWindow.collectionBehavior = [.canJoinAllSpaces]
 
         // Calculate centered target frame
         let fullWidth: CGFloat = 680
@@ -240,18 +236,18 @@ struct MiniPlayerView: View {
         let targetFrame = NSRect(x: targetX, y: targetY, width: fullWidth, height: fullHeight)
 
         // Start full window at mini player position/size, then animate to centered target
-        window.setFrame(miniFrame, display: false)
-        window.alphaValue = 0.0
-        window.makeKeyAndOrderFront(nil)
-        (window as? MainPlayerWindow)?.updateTitle()
+        mainWindow.setFrame(miniFrame, display: false)
+        mainWindow.alphaValue = 0.0
+        mainWindow.makeKeyAndOrderFront(nil)
+        mainWindow.updateTitle()
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.35
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             ctx.allowsImplicitAnimation = true
 
-            window.animator().setFrame(targetFrame, display: true)
-            window.animator().alphaValue = 1.0
+            mainWindow.animator().setFrame(targetFrame, display: true)
+            mainWindow.animator().alphaValue = 1.0
         } completionHandler: {
             miniPanel.orderOut(nil)
         }

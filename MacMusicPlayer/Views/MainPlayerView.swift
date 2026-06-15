@@ -162,12 +162,12 @@ struct MainPlayerView: View {
 
     private var controlBar: some View {
         GeometryReader { geo in
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 // Playback controls
-                HStack(spacing: 8) {
-                    controlButton("⏮") { player.playPrevious() }
+                HStack(spacing: 10) {
+                    controlButton(icon: "backward.fill", size: 16) { player.playPrevious() }
                     playPauseButton
-                    controlButton("⏭") { player.playNext() }
+                    controlButton(icon: "forward.fill", size: 16) { player.playNext() }
                 }
 
                 // Progress — hidden when window is too narrow
@@ -193,42 +193,47 @@ struct MainPlayerView: View {
                         showPlaylist.toggle()
                     }
                 }) {
-                    Text("♪")
-                        .font(.system(size: 14))
-                        .foregroundColor(showPlaylist ? Color.tnAccent : .white.opacity(0.4))
-                        .frame(width: 30, height: 30)
-                        .background(showPlaylist ? Color.tnAccent.opacity(0.06) : Color.clear)
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(showPlaylist ? Color.tnAccent.opacity(0.12) : Color.white.opacity(0.03), lineWidth: 1)
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(showPlaylist ? Color.tnAccent : .white.opacity(0.5))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            showPlaylist
+                                ? Color.tnAccent.opacity(0.08)
+                                : Color.white.opacity(0.04)
                         )
+                        .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
 
                 // Mini player toggle
                 Button(action: switchToMiniPlayer) {
                     Image(systemName: "arrow.down.forward.and.arrow.up.backward")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                        .frame(width: 30, height: 30)
-                        .background(Color.white.opacity(0.02))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(width: 34, height: 34)
+                        .background(Color.white.opacity(0.04))
                         .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.white.opacity(0.03), lineWidth: 1)
-                        )
                 }
                 .buttonStyle(.plain)
                 .help("Switch to mini player")
             }
-            .frame(height: 44)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(height: 52)
+            .background(
+                // Glass effect for control bar
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.7)
+            )
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
         }
-        .frame(height: 44)
+        .frame(height: 52)
     }
 
     /// Play mode button — cycles sequential → singleLoop → random → sequential
-    /// Uses SF Symbols for clean macOS-native icons.
     private var playModeButton: some View {
         Button(action: {
             let modes: [PlayMode] = [.sequential, .singleLoop, .random]
@@ -244,13 +249,9 @@ struct MainPlayerView: View {
             }
             .foregroundColor(.white.opacity(0.6))
             .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.tnAccent.opacity(0.04))
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.04))
             .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.tnAccent.opacity(0.08), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
     }
@@ -275,26 +276,22 @@ struct MainPlayerView: View {
         Button(action: {
             player.isPlaying ? player.pause() : player.play()
         }) {
-            Text(player.isPlaying ? "⏸" : "▶")
+            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 18))
                 .foregroundColor(Color.tnAccent)
-                .frame(width: 44, height: 44)
-                .background(Color.tnAccent.opacity(0.08))
+                .frame(width: 48, height: 48)
+                .background(Color.tnAccent.opacity(0.1))
                 .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Color.tnAccent.opacity(0.1), lineWidth: 1)
-                )
         }
         .buttonStyle(.plain)
     }
 
-    private func controlButton(_ label: String, action: @escaping () -> Void) -> some View {
+    private func controlButton(icon: String, size: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(label)
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.5))
-                .frame(width: 34, height: 34)
+            Image(systemName: icon)
+                .font(.system(size: size, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
+                .frame(width: 36, height: 36)
         }
         .buttonStyle(.plain)
     }
