@@ -17,7 +17,6 @@ struct AlbumArtBackground: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
-                    .ignoresSafeArea()
             } else {
                 // Fallback: pure dark background
                 Color(red: 0.031, green: 0.031, blue: 0.055)
@@ -53,6 +52,7 @@ struct AlbumArtBackground: View {
                 endPoint: .bottom
             )
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) {
                 breathe = true
