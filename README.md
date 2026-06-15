@@ -24,7 +24,8 @@
 
 - 🎛️ 控制栏 3 秒无操作自动淡出隐藏，鼠标经过恢复
 
-<img width="716" height="616" alt="image" src="https://github.com/user-attachments/assets/95b2ba1c-0cfe-4248-8a29-4e1d3b783ad8" />
+<img width="716" height="616" alt="image" src="https://github.com/user-attachments/assets/c8554f7e-0245-436d-9045-83d2b513e007" />
+
 <img width="336" height="186" alt="image" src="https://github.com/user-attachments/assets/e4c9a308-4228-4b66-b71f-eb1f277191df" />
 
 
