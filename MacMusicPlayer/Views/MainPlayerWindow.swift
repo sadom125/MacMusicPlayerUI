@@ -57,6 +57,10 @@ class MainPlayerWindow: NSWindow {
         // Green button will zoom (maximize) instead of entering fullscreen.
         self.collectionBehavior = [.fullScreenNone]
 
+        // Apply saved window opacity
+        let savedOpacity = UserDefaults.standard.double(forKey: "windowOpacity")
+        self.alphaValue = CGFloat(savedOpacity > 0 ? savedOpacity : 1.0)
+
         self.center()
         self.acceptsMouseMovedEvents = true
     }

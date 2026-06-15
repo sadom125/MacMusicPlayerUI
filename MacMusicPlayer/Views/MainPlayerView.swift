@@ -13,6 +13,7 @@ struct MainPlayerView: View {
     @State private var currentLyricIndex: Int = 0
     @State private var artworkFallbackCache: [UUID: Data?] = [:]
     @AppStorage("showAlbumArt") private var showAlbumArt: Bool = true
+    @AppStorage("windowOpacity") private var windowOpacity: Double = 1.0
 
     // MARK: - Auto-hide controls
 
@@ -215,11 +216,11 @@ struct MainPlayerView: View {
                 }) {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(showPlaylist ? PlayerTheme.current.accent : .white.opacity(0.5))
+                        .foregroundColor(showPlaylist ? themeManager.accent : .white.opacity(0.5))
                         .frame(width: 34, height: 34)
                         .background(
                             showPlaylist
-                                ? PlayerTheme.current.accent.opacity(0.08)
+                                ? themeManager.accent.opacity(0.08)
                                 : Color.white.opacity(0.04)
                         )
                         .cornerRadius(8)
@@ -234,11 +235,11 @@ struct MainPlayerView: View {
                 }) {
                     Image(systemName: showAlbumArt ? "photo" : "xmark.rectangle")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(showAlbumArt ? PlayerTheme.current.accent : .white.opacity(0.5))
+                        .foregroundColor(showAlbumArt ? themeManager.accent : .white.opacity(0.5))
                         .frame(width: 34, height: 34)
                         .background(
                             showAlbumArt
-                                ? PlayerTheme.current.accent.opacity(0.08)
+                                ? themeManager.accent.opacity(0.08)
                                 : Color.white.opacity(0.04)
                         )
                         .cornerRadius(8)
@@ -259,6 +260,22 @@ struct MainPlayerView: View {
                 }
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
                 .help("Theme: \(themeManager.themeName)")
+
+                // Window opacity slider
+                HStack(spacing: 4) {
+                    Image(systemName: "circle.lefthalf.filled")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+                    Slider(value: $windowOpacity, in: 0.3...1.0)
+                        .frame(width: 60)
+                        .tint(themeManager.accent)
+                }
+                .frame(height: 34)
+                .onChange(of: windowOpacity) { newValue in
+                    if let win = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) {
+                        win.alphaValue = CGFloat(newValue)
+                    }
+                }
 
                 // Mini player toggle
                 Button(action: switchToMiniPlayer) {
@@ -332,9 +349,9 @@ struct MainPlayerView: View {
         }) {
             Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 18))
-                .foregroundColor(PlayerTheme.current.accent)
+                .foregroundColor(themeManager.accent)
                 .frame(width: 48, height: 48)
-                .background(PlayerTheme.current.accent.opacity(0.1))
+                .background(themeManager.accent.opacity(0.1))
                 .clipShape(Circle())
         }
         .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
