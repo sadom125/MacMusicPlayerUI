@@ -14,7 +14,13 @@ Package.resolved
 
 # macOS
 .DS_Store
+Icon?
+._*
+
+# Editor
 *.swp
+*.swo
+*~
 *.lock
 ~$*
 
@@ -22,3 +28,22 @@ Package.resolved
 build/
 *.app
 *.framework
+
+# CocoaPods (if any)
+Podfile.lock
+
+# Carthage (if any)
+Carthage/
+
+# fastlane (if any)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Crash logs
+*.crash
+
+# Signing
+*.mobileprovision
+*.provisionprofile

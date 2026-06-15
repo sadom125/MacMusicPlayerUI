@@ -1,75 +1,97 @@
-# MacMusicPlayer
+# LX Music macOS Client
 
 <div align="center">
-  <img src="./MacMusicPlayer/Assets.xcassets/AppIcon.appiconset/icon_256x256_2x.png" alt="MacMusicPlayer" width="128" />
   <br />
-  <div id="download-section" style="margin: 20px 0;">
-    <a href="#" onclick="downloadLatest(); return false;" style="text-decoration: none;">
-      <img src="https://img.shields.io/badge/⬇%20Download%20for%20Your%20System-28a745?style=for-the-badge&labelColor=28a745" alt="Download" />
-    </a>
-  </div>
-  <p>An elegant and minimalist menu bar music player for macOS (no Dock icon), providing a seamless music playback experience.</p>
+  <p><strong>沉浸式歌词播放器 — Dark Immersion 设计</strong></p>
   <p>
-    <a href="https://github.com/samzong/MacMusicPlayer/releases"><img src="https://img.shields.io/github/v/release/samzong/MacMusicPlayer" alt="Release" /></a>
-    <a href="https://github.com/samzong/MacMusicPlayer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/samzong/MacMusicPlayer" alt="License" /></a>
-    <a href="https://deepwiki.com/samzong/MacMusicPlayer"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+    <img src="https://img.shields.io/badge/macOS-12.0%2B-blue" alt="macOS 12.0+" />
+    <img src="https://img.shields.io/badge/Swift-6.0-orange" alt="Swift 6.0" />
+    <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License" />
   </p>
 </div>
 
-## Requirements
+---
 
-- macOS 12.0 (Monterey) or later
+基于 [samzong/MacMusicPlayer](https://github.com/samzong/MacMusicPlayer) 增量改造的 macOS 原生音乐播放器，专注于**沉浸式歌词体验**。
 
-## Installation
+## 设计风格
 
-### Homebrew (Recommended)
+**Dark Immersion** — 纯黑底 `#08080e` + 蓝 accent `#60b0ff` + 紫辅助 `#b388ff`
+
+- 🎵 封面作为全幅背景，底部渐变淡出 + 环境光晕呼吸动画
+- 📝 居中 LRC 滚动歌词，active 行高亮 + `past/near/active` 三层透明度
+- 🖼️ 支持 FLAC 内嵌封面/歌词的同步字节扫描（无需等待异步解析）
+- 🎛️ 控制栏 3 秒无操作自动淡出隐藏，鼠标经过恢复
+
+## 功能
+
+- 🎧 本地音乐播放（mp3/m4a/wav/flac/aac/ogg/aiff）
+- 📝 **LRC 歌词支持**：外置 `.lrc` 文件 → FLAC 内嵌 LYRICS 标签 → 字节扫描兜底
+- 🖼️ **封面显示**：ID3/Vorbis 封面 → FLAC 字节扫描 JPEG/PNG → 纯黑背景
+- 🔄 播放模式：列表循环 / 单曲循环 / 随机播放
+- 🎮 媒体键控制 + 菜单栏快捷操作
+- 📚 多音乐库支持
+- 📥 YouTube 下载（需 yt-dlp + ffmpeg）
+- 🌙 阻止休眠
+
+## 最低要求
+
+- macOS 12.0 (Monterey) 或更高
+
+## 构建
 
 ```bash
-brew install samzong/tap/mac-music-player
+git clone https://github.com/你的用户名/MacMusicPlayer.git
+cd MacMusicPlayer
+
+xcodebuild -project MacMusicPlayer.xcodeproj \
+  -scheme MacMusicPlayer \
+  -derivedDataPath /tmp/MacMusicPlayerDerivedData \
+  -destination "platform=macOS" build
+
+open /tmp/MacMusicPlayerDerivedData/Build/Products/Debug/MacMusicPlayer.app
 ```
 
-### DMG
+或在 Xcode 中打开 `MacMusicPlayer.xcodeproj`，⌘B 构建 → ⌘R 运行。
 
-Download the latest `MacMusicPlayer.dmg` from the [Releases](https://github.com/samzong/MacMusicPlayer/releases) page.
+## 歌词加载策略（四级降级）
 
-> **Security Note**: If you encounter a security warning on first launch, right-click the app and select "Open", or run: `xattr -dr com.apple.quarantine /Applications/MacMusicPlayer.app`
+```
+1. 外置 .lrc 文件（与音频同目录）
+2. 音源内嵌 LYRICS 标签（async AVAsset）
+3. 同步 FLAC 字节扫描 LYRICS（兜底，无需等待异步解析）
+4. 歌名/歌手/专辑 fallback
+```
 
-## Features
+## 封面加载策略（三级）
 
-- 🎵 Lightweight menu bar player for instant music control
-- 🎨 Native macOS interface with perfect light/dark theme support
-- 🌍 Multi-language support (English, Simplified Chinese, Traditional Chinese, Japanese, Korean)
-- 🔎 Song picker (⌘F in menu) with instant filename filtering
-- 🎧 Audio format support (mp3, m4a, wav, flac, aac, ogg, aiff)
-- 🔄 Multiple playback modes (Sequential, Single Loop, Random)
-- 📚 Multiple music libraries with quick switch (⌘R to refresh)
-- 📥 Built-in YouTube/SoundCloud search & playlist downloads with format selection (requires yt-dlp + ffmpeg)
-- 💾 Smart memory of last music folder location and volume
-- 🚀 Launch at login (enabled by default)
-- 🌙 Prevent-sleep toggle (enabled by default) and configurable song picker on launch
-- ⌨️ Media key control and keyboard shortcuts (⌘D Download, ⌘S Settings)
+```
+1. Track.albumArtData（async AVAsset）
+2. 同步 FLAC 字节扫描 JPEG/PNG（兜底）
+3. 纯黑 #08080e 背景
+```
 
-## Configuration & Tips
+## 沉浸式控制栏
 
-- Download dependencies (yt-dlp, ffmpeg) are installed automatically via Homebrew; manual install (`brew install yt-dlp ffmpeg`) is required for DMG users.
-- Configure API URL and API Key in **Settings** to enable YouTube search (requires a custom search proxy service).
-- Pick the destination library in the Download window; use **Download All** button to download entire playlists, or **Refresh Current Library** to rescan music quickly.
-- For best metadata display, name your files as `Artist - Title.mp3` format.
+- 播放中 3 秒无操作 → 控制栏向下淡出隐藏
+- 鼠标移动 → 立即恢复显示
+- 暂停时始终可见
 
-## Screenshots
+## 技术栈
 
-### Menu Items
+| 组件 | 技术 |
+|------|------|
+| 播放引擎 | AVQueuePlayer |
+| 元数据 | AVAsset.metadata + 同步字节扫描 |
+| UI 框架 | SwiftUI + AppKit (NSHostingView) |
+| 毛玻璃 | NSVisualEffectView (.hudWindow) |
+| 持久化 | UserDefaults + JSON |
+| 最低系统 | macOS 12.0 |
 
-![](MenuItems.png)
+## 致谢
 
-### Download Music
-
-![](DownloadMusic.png)
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit Issues and Pull Requests.
+- [samzong/MacMusicPlayer](https://github.com/samzong/MacMusicPlayer) — 原始开源项目
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License — 详见 [LICENSE](LICENSE) 文件。
