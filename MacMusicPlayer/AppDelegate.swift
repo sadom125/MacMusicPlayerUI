@@ -15,8 +15,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var downloadWindow: NSWindow?
     private var configWindow: NSWindow?
     private var songPickerWindow: SimpleSongPickerWindow?
-    private var mainPlayerWindow: MainPlayerWindow?
-    private var miniPlayerWindow: MiniPlayerWindow?
+    private(set) var mainPlayerWindow: MainPlayerWindow?
+    private(set) var miniPlayerWindow: MiniPlayerWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         playerManager = PlayerManager()
@@ -314,6 +314,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let window = MiniPlayerWindow.show(playerManager: playerManager)
         window.delegate = self
         self.miniPlayerWindow = window
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc func showMainWindow() {

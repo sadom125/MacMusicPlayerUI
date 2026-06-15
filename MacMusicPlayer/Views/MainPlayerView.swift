@@ -144,6 +144,17 @@ struct MainPlayerView: View {
         }
     }
 
+    /// Switch from full player to mini player
+    private func switchToMiniPlayer() {
+        // Close this window
+        NSApplication.shared.windows
+            .first(where: { $0 is MainPlayerWindow })?
+            .close()
+        // Create and show mini player
+        let miniWindow = MiniPlayerWindow(playerManager: player)
+        miniWindow.makeKeyAndOrderFront(nil)
+    }
+
     // MARK: - Control Bar
 
     private var controlBar: some View {
@@ -191,6 +202,22 @@ struct MainPlayerView: View {
                         )
                 }
                 .buttonStyle(.plain)
+
+                // Mini player toggle
+                Button(action: switchToMiniPlayer) {
+                    Image(systemName: "arrow.down.forward.and.arrow.up.backward")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                        .frame(width: 30, height: 30)
+                        .background(Color.white.opacity(0.02))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.03), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Switch to mini player")
             }
             .frame(height: 44)
         }
