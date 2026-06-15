@@ -41,7 +41,7 @@ struct MetadataParser {
             ?? NSLocalizedString("Unknown Artist", comment: "Default artist name")
         let album = findMetadataItem(metadata: metadata, key: AVMetadataKey.commonKeyAlbumName)
             ?? NSLocalizedString("Unknown Album", comment: "Default album name")
-        let artworkData = findArtwork(metadata: metadata)
+        let artworkData = findArtwork(metadata: metadata) ?? extractArtworkViaFFmpeg(url: url)
         let lyrics = findLyrics(metadata: metadata)
 
         return Metadata(
@@ -71,12 +71,62 @@ struct MetadataParser {
         let artItem = metadata.first(where: { $0.commonKey == .commonKeyArtwork })
         if let item = artItem {
             if let data = item.dataValue, data.count > 0 {
-                return data
+                // FLAC METADATA_BLOCK_PICTURE wraps the image in a Vorbis comment header.
+                // Try to extract the raw image data from the block.
+                return extractImageFromVorbisPictureBlock(data) ?? data
             }
             // Some formats store artwork as Data in the value
             if let value = item.value as? Data, value.count > 0 {
-                return value
+                return extractImageFromVorbisPictureBlock(value) ?? value
             }
+        }
+        return nil
+    }
+
+    /// Extract raw image data from FLAC METADATA_BLOCK_PICTURE format.
+    /// Format: pictureType(4) + mimeLen(4) + mime(mimeLen) + descLen(4) + desc(descLen)
+    ///         + width(4) + height(4) + colorDepth(4) + numColors(4) + dataLen(4) + imageData(dataLen)
+    private static func extractImageFromVorbisPictureBlock(_ data: Data) -> Data? {
+        guard data.count > 4 else { return nil }
+
+        // If data already starts with JPEG/PNG magic, it's raw image data — return as-is
+        let first3 = data.prefix(3)
+        let first4 = data.prefix(4)
+        if first3 == Data([0xFF, 0xD8, 0xFF]) || // JPEG
+           first4 == Data([0x89, 0x50, 0x4E, 0x47]) { // PNG
+            return data
+        }
+
+        // Otherwise, try to parse as Vorbis METADATA_BLOCK_PICTURE
+        guard data.count > 32 else { return nil }
+
+        var offset = 0
+        func readUInt32() -> UInt32? {
+            guard offset + 4 <= data.count else { return nil }
+            let value = data.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
+            offset += 4
+            return value.byteSwapped  // FLAC uses big-endian
+        }
+
+        guard let pictureType = readUInt32(), pictureType <= 21 else { return nil }
+        guard let mimeLen = readUInt32(), offset + Int(mimeLen) <= data.count else { return nil }
+        offset += Int(mimeLen)  // skip MIME type
+        guard let descLen = readUInt32(), offset + Int(descLen) <= data.count else { return nil }
+        offset += Int(descLen)  // skip description
+        _ = readUInt32()  // width
+        _ = readUInt32()  // height
+        _ = readUInt32()  // color depth
+        _ = readUInt32()  // number of indexed colors
+        guard let dataLen = readUInt32(), offset + Int(dataLen) <= data.count else { return nil }
+
+        let imageData = data.subdata(in: offset..<offset + Int(dataLen))
+        // Verify it's a valid image by checking magic bytes
+        guard imageData.count > 4 else { return nil }
+        let imgFirst3 = imageData.prefix(3)
+        let imgFirst4 = imageData.prefix(4)
+        if imgFirst3 == Data([0xFF, 0xD8, 0xFF]) || // JPEG
+           imgFirst4 == Data([0x89, 0x50, 0x4E, 0x47]) { // PNG
+            return imageData
         }
         return nil
     }
@@ -96,6 +146,29 @@ struct MetadataParser {
             return value
         }
         return nil
+    }
+
+    /// Extract embedded artwork using ffmpeg as a fallback when AVAsset can't read it.
+    /// Some FLAC files store artwork in a format AVAsset doesn't recognize.
+    private static func extractArtworkViaFFmpeg(url: URL) -> Data? {
+        let tempPath = NSTemporaryDirectory() + UUID().uuidString + ".jpg"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg")
+        process.arguments = ["-i", url.path, "-an", "-vcodec", "copy", "-y", tempPath]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else { return nil }
+        let data = try? Data(contentsOf: URL(fileURLWithPath: tempPath))
+        try? FileManager.default.removeItem(atPath: tempPath)
+        return data
     }
 
     /// Synchronously read LYRICS tag from a FLAC file by scanning raw Vorbis comments.

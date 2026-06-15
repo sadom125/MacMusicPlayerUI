@@ -9,4 +9,8 @@ struct Track: Identifiable, Equatable {
     let duration: TimeInterval
     let url: URL
     let lyrics: String?      // embedded LRC lyrics (e.g. FLAC Vorbis LYRICS tag)
+
+    static func == (lhs: Track, rhs: Track) -> Bool {
+        lhs.id == rhs.id
+    }
 }

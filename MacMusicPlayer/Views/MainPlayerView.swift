@@ -10,6 +10,7 @@ struct MainPlayerView: View {
     @State private var showPlaylist: Bool = false
     @State private var lyrics: [LyricLine] = []
     @State private var currentLyricIndex: Int = 0
+    @State private var artworkFallbackCache: [UUID: Data?] = [:]
 
     // MARK: - Auto-hide controls
 
@@ -20,17 +21,24 @@ struct MainPlayerView: View {
     private let idleThreshold: TimeInterval = 3.0
     private let idleCheckInterval: TimeInterval = 0.5
 
-    /// Artwork from Track model, falling back to synchronous FLAC scan.
+    /// Artwork from Track model, falling back to synchronous FLAC scan (cached per track).
     private var currentArtworkData: Data? {
-        if let data = player.currentTrack?.albumArtData { return data }
-        guard let url = player.currentTrack?.url else { return nil }
-        return MetadataParser.parseArtworkDirect(from: url)
+        guard let track = player.currentTrack else { return nil }
+        // Always prefer async metadata — this is the real source of truth
+        if let data = track.albumArtData { return data }
+        // Fallback: synchronous FLAC scan, cached per track to avoid repeated I/O
+        if let cached = artworkFallbackCache[track.id] { return cached }
+        let data = MetadataParser.parseArtworkDirect(from: track.url)
+        artworkFallbackCache[track.id] = data
+        NSLog("[Artwork] FLAC scan result: %d bytes", data?.count ?? 0)
+        return data
     }
 
     /// Background view that fills safely behind the VStack content.
     private var albumArtBackground: some View {
         AlbumArtBackground(
             artworkData: currentArtworkData,
+            trackID: player.currentTrack?.id,
             isAnimating: player.isPlaying
         )
         .clipped()

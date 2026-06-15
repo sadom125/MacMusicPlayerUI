@@ -233,10 +233,11 @@ class PlayerManager: NSObject, ObservableObject {
                 // Kick off async metadata parsing in background
                 let trackID = track.id
                 let capturedURL = fileURL
+                let capturedTrack = track  // capture the actual Track object
                 metadataTasks[trackID] = Task { [weak self] in
                     guard let self else { return }
                     guard let meta = await MetadataParser.parse(from: capturedURL) else { return }
-                    self.updateTrack(trackID: trackID, with: meta)
+                    self.updateTrackDirect(capturedTrack, with: meta)
                 }
             }
         }
@@ -305,6 +306,43 @@ class PlayerManager: NSObject, ObservableObject {
 
             // If this is the current track, update it
             if currentTrack?.id == trackID {
+                currentTrack = updated
+                duration = meta.duration
+                if isPlaying {
+                    updateNowPlayingInfo()
+                }
+            }
+        }
+    }
+
+    /// Update track directly using captured Track reference (avoids playlist lookup race condition).
+    private func updateTrackDirect(_ original: Track, with meta: MetadataParser.Metadata) {
+        let updated = Track(
+            id: original.id,
+            title: meta.title,
+            artist: meta.artist,
+            album: meta.album,
+            albumArtData: meta.artworkData,
+            duration: meta.duration,
+            url: original.url,
+            lyrics: meta.lyrics
+        )
+
+        DispatchQueue.main.async { [self] in
+            // Update in playlist by ID
+            if let idx = playlist.firstIndex(where: { $0.id == original.id }) {
+                playlist[idx] = updated
+            }
+
+            // Update in playlistStore
+            if let storeIdx = playlistStore.tracks.firstIndex(where: { $0.id == original.id }) {
+                var storeTracks = playlistStore.tracks
+                storeTracks[storeIdx] = updated
+                playlistStore.setTracks(storeTracks)
+            }
+
+            // If this is the current track, update it
+            if currentTrack?.id == original.id {
                 currentTrack = updated
                 duration = meta.duration
                 if isPlaying {
