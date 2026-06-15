@@ -1,7 +1,12 @@
-import SwiftUI
-import AppKit
+//
+//  AlbumArtBackground.swift
+//  MacMusicPlayer
+//
+//  Full-bleed album art background with breathing glow.
+//
 
-/// Full-width album art as background, with bottom fade to black and gentle breathing glow.
+import SwiftUI
+
 struct AlbumArtBackground: View {
     let artworkData: Data?
     let trackID: UUID?
@@ -10,48 +15,58 @@ struct AlbumArtBackground: View {
     @State private var breathe: Bool = false
 
     var body: some View {
-        ZStack {
-            // Album art image — semi-transparent so glass effect shows through
-            if let data = artworkData, let nsImage = NSImage(data: data) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fill)
-                    .opacity(0.5)
-                    .transition(.opacity)
-            } else {
-                Color.clear
-                    .transition(.opacity)
-            }
+        GeometryReader { geo in
+            ZStack {
+                // Album art
+                if let data = artworkData, let nsImage = NSImage(data: data) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                        .opacity(0.5)
+                        .transition(.opacity)
+                } else {
+                    Color.clear.transition(.opacity)
+                }
 
-            // Ambient glow overlay (breathing animation)
-            if let data = artworkData, let nsImage = NSImage(data: data) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .blur(radius: 60)
-                    .opacity(0.2)
-                    .scaleEffect(breathe ? 1.04 : 1.0)
-                    .blendMode(.screen)
-                    .transition(.opacity)
-            } else {
-                Color.tnAccent
-                    .opacity(0.08)
-                    .blur(radius: 80)
-                    .scaleEffect(breathe ? 1.06 : 1.0)
-                    .transition(.opacity)
-            }
+                // Breathing glow overlay
+                if artworkData != nil {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.accentColor.opacity(0.15 * (breathe ? 1 : 0.5)),
+                                    Color.clear,
+                                ],
+                                center: .center,
+                                startRadius: geo.size.width * 0.1,
+                                endRadius: geo.size.width * 0.6
+                            )
+                        )
+                        .frame(width: geo.size.width * 0.9, height: geo.size.height * 0.9)
+                        .blur(radius: 60)
+                        .offset(y: -20)
+                        .allowsHitTesting(false)
+                }
 
-            // Subtle dark overlay for text readability
-            LinearGradient(
-                gradient: Gradient(stops: [
-                    .init(color: .clear, location: 0.0),
-                    .init(color: .black.opacity(0.15), location: 0.5),
-                    .init(color: .black.opacity(0.3), location: 1.0)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
+                // Bottom gradient fade
+                VStack {
+                    Spacer()
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(0.6),
+                            Color.black.opacity(0.2),
+                            Color.clear,
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                    .frame(height: geo.size.height * 0.45)
+                }
+                .allowsHitTesting(false)
+            }
         }
         .animation(.easeInOut(duration: 0.5), value: trackID)
         .onAppear {
@@ -60,4 +75,13 @@ struct AlbumArtBackground: View {
             }
         }
     }
+}
+
+#Preview {
+    ZStack {
+        AlbumArtBackground(artworkData: nil, trackID: nil)
+        Text("Album Art Background")
+            .foregroundColor(.white)
+    }
+    .frame(width: 600, height: 400)
 }

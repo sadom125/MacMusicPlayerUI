@@ -48,8 +48,8 @@ struct MainPlayerView: View {
             VStack(spacing: 0) {
                 // Control bar
                 controlBar
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 8)
+                .padding(.horizontal, 32)
+                .padding(.bottom, 8)
 
                 // Playlist panel
                 if showPlaylist {
@@ -133,6 +133,20 @@ struct MainPlayerView: View {
     /// Switch to mini player with smooth animation
     private func switchToMiniPlayer() {
         guard let fullWindow = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else { return }
+
+        // If window is maximized (zoomed), restore to normal size first
+        if fullWindow.isZoomed {
+            fullWindow.zoom(nil)
+            // Wait for zoom animation to finish before continuing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                self.performMiniPlayerSwitch(fullWindow: fullWindow)
+            }
+        } else {
+            performMiniPlayerSwitch(fullWindow: fullWindow)
+        }
+    }
+
+    private func performMiniPlayerSwitch(fullWindow: NSWindow) {
         let sourceFrame = fullWindow.frame
 
         // Create mini player without showing it yet

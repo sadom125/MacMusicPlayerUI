@@ -53,8 +53,17 @@ class MainPlayerWindow: NSWindow {
 
         self.contentView = glassView
 
+        // Disable fullscreen to avoid macOS _NSExitFullScreenTransitionController crash.
+        // Green button will zoom (maximize) instead of entering fullscreen.
+        self.collectionBehavior = [.fullScreenNone]
+
         self.center()
         self.acceptsMouseMovedEvents = true
+    }
+
+    /// Override to use zoom instead of fullscreen — avoids AppKit fullscreen transition crash.
+    override func toggleFullScreen(_ sender: Any?) {
+        zoom(sender)
     }
 
     /// Update the SwiftUI content without replacing the hosting view (preserves glass background).
