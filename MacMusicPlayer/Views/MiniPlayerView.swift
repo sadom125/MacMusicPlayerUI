@@ -160,7 +160,7 @@ struct MiniPlayerView: View {
         .onAppear {
             loadLyricsForCurrentTrack()
         }
-        .onChange(of: player.currentTrack?.id) { _ in
+        .onChange(of: player.currentTrack?.title) { _ in
             loadLyricsForCurrentTrack()
         }
     }
@@ -189,12 +189,27 @@ struct MiniPlayerView: View {
     }
 
     private func returnToFullPlayer() {
-        // Close mini player
-        NSApplication.shared.windows
-            .first(where: { $0 is MiniPlayerWindow })?
-            .close()
-        // Show full player
-        (NSApplication.shared.delegate as? AppDelegate)?.showMainWindow()
+        guard let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else {
+            // Fallback
+            (NSApplication.shared.delegate as? AppDelegate)?.showMainWindow()
+            return
+        }
+        let fullView = MainPlayerView(player: player)
+            .environment(\.colorScheme, .dark)
+        let hosting = NSHostingView(rootView: AnyView(fullView))
+        hosting.frame = window.contentView?.bounds ?? .zero
+        hosting.autoresizingMask = [.width, .height]
+
+        window.titleVisibility = .visible
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.isMovableByWindowBackground = false
+        window.level = .normal
+        window.collectionBehavior = [.canJoinAllSpaces]
+        window.contentView = hosting
+        window.setFrame(NSRect(x: 0, y: 0, width: 680, height: 580), display: true, animate: true)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        (window as? MainPlayerWindow)?.updateTitle()
     }
 }
 

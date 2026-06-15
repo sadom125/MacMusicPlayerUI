@@ -312,6 +312,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let window = MiniPlayerWindow.show(playerManager: playerManager)
+        window.makeKeyAndOrderFront(nil)
         window.delegate = self
         self.miniPlayerWindow = window
         NSApp.activate(ignoringOtherApps: true)

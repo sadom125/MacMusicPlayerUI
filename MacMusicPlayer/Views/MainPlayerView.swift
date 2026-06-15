@@ -144,15 +144,28 @@ struct MainPlayerView: View {
         }
     }
 
-    /// Switch from full player to mini player
+    /// Switch to mini player by swapping the window's content view
     private func switchToMiniPlayer() {
-        // Close this window
-        NSApplication.shared.windows
-            .first(where: { $0 is MainPlayerWindow })?
-            .close()
-        // Create and show mini player
-        let miniWindow = MiniPlayerWindow(playerManager: player)
-        miniWindow.makeKeyAndOrderFront(nil)
+        guard let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else { return }
+        let miniView = MiniPlayerView(player: player)
+            .environment(\.colorScheme, .dark)
+        let hosting = NSHostingView(rootView: AnyView(miniView))
+        hosting.frame = window.contentView?.bounds ?? .zero
+        hosting.autoresizingMask = [.width, .height]
+
+        window.titleVisibility = .hidden
+        window.styleMask = [.titled, .nonactivatingPanel, .fullSizeContentView]
+        window.isMovableByWindowBackground = true
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.contentView = hosting
+
+        // Move to bottom-right
+        if let screen = NSScreen.main {
+            let sf = screen.visibleFrame
+            window.setFrame(NSRect(x: sf.maxX - 320, y: sf.minY + 40, width: 300, height: 130), display: true, animate: true)
+        }
+        window.makeKeyAndOrderFront(nil)
     }
 
     // MARK: - Control Bar
