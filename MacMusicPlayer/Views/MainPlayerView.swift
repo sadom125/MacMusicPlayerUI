@@ -220,7 +220,6 @@ struct MainPlayerView: View {
 
         // 2b. Direct synchronous scan of raw FLAC Vorbis comments for LYRICS tag
         if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
-        if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
             let parsed = LrcParser.parse(lrcText: lrcText)
             if !parsed.isEmpty {
                 lyrics = parsed
@@ -247,7 +246,7 @@ struct MainPlayerView: View {
 
     private func updateLyricIndex(time: TimeInterval) {
         guard !lyrics.isEmpty else {
-            currentLyricIndex = 0
+            if currentLyricIndex != 0 { currentLyricIndex = 0 }
             return
         }
         // Find the last lyric line whose time <= current time
@@ -257,7 +256,10 @@ struct MainPlayerView: View {
                 idx = i
             }
         }
-        currentLyricIndex = idx
+        // Only update when index actually changes (avoids unnecessary re-renders)
+        if idx != currentLyricIndex {
+            currentLyricIndex = idx
+        }
     }
 
     // MARK: - Dominant Color

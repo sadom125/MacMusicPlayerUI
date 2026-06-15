@@ -15,22 +15,13 @@ struct LyricsView: View {
                     Color.clear.frame(height: 100)
 
                     ForEach(Array(lyrics.enumerated()), id: \.element.id) { index, line in
-                        Text(line.text)
-                            .font(index == currentLineIndex
-                                ? .system(size: 18, weight: .semibold)
-                                : .system(size: 14))
-                            .foregroundColor(textColor(for: index))
-                            .lineSpacing(6)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, index == currentLineIndex ? 8 : 3)
-                            .background(
-                                index == currentLineIndex
-                                    ? Color.accentColor.opacity(0.04)
-                                    : Color.clear
-                            )
-                            .cornerRadius(8)
-                            .id(index)
-                            .frame(maxWidth: .infinity)
+                        LyricLineView(
+                            text: line.text,
+                            isActive: index == currentLineIndex,
+                            proximity: proximity(index)
+                        )
+                        .id(index)
+                        .frame(maxWidth: .infinity)
                     }
 
                     // Bottom spacer
@@ -50,22 +41,46 @@ struct LyricsView: View {
                 )
             )
             .onChange(of: currentLineIndex) { newIndex in
-                withAnimation(.easeInOut(duration: 0.4)) {
+                withAnimation(.easeOut(duration: 0.12)) {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }
             }
         }
     }
 
-    private func textColor(for index: Int) -> Color {
-        if index == currentLineIndex {
-            return .white
+    private func proximity(_ index: Int) -> Proximity {
+        let diff = index - currentLineIndex
+        if diff == 0 { return .active }
+        if abs(diff) <= 2 { return .near }
+        return .far
+    }
+
+    enum Proximity { case active, near, far }
+}
+
+/// Individual lyric line with pre-computed style, avoids full ForEach re-evaluation.
+struct LyricLineView: View {
+    let text: String
+    let isActive: Bool
+    let proximity: LyricsView.Proximity
+
+    var body: some View {
+        Text(text)
+            .font(isActive ? .system(size: 18, weight: .semibold) : .system(size: 14))
+            .foregroundColor(foreground)
+            .lineSpacing(6)
+            .padding(.horizontal, 24)
+            .padding(.vertical, isActive ? 8 : 3)
+            .background(isActive ? Color.accentColor.opacity(0.04) : Color.clear)
+            .cornerRadius(8)
+    }
+
+    private var foreground: Color {
+        switch proximity {
+        case .active: return .white
+        case .near:   return .white.opacity(0.5)
+        case .far:    return .white.opacity(0.15)
         }
-        let diff = abs(index - currentLineIndex)
-        if diff <= 2 {
-            return .white.opacity(0.5)
-        }
-        return .white.opacity(0.15)
     }
 }
 
