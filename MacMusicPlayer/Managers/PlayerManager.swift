@@ -225,7 +225,8 @@ class PlayerManager: NSObject, ObservableObject {
                     album: NSLocalizedString("Unknown Album", comment: "Default album name"),
                     albumArtData: nil,
                     duration: 0,
-                    url: fileURL
+                    url: fileURL,
+                    lyrics: nil
                 )
                 newPlaylist.append(track)
 
@@ -271,7 +272,7 @@ class PlayerManager: NSObject, ObservableObject {
         let updated = Track(
             id: track.id, title: track.title, artist: track.artist,
             album: track.album, albumArtData: track.albumArtData,
-            duration: playerDuration, url: track.url
+            duration: playerDuration, url: track.url, lyrics: track.lyrics
         )
         self.playlist[idx] = updated
         self.currentTrack = updated
@@ -288,7 +289,8 @@ class PlayerManager: NSObject, ObservableObject {
             album: meta.album,
             albumArtData: meta.artworkData,
             duration: meta.duration,
-            url: old.url
+            url: old.url,
+            lyrics: meta.lyrics
         )
         playlist[idx] = updated
 

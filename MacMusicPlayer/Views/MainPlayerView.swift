@@ -197,7 +197,7 @@ struct MainPlayerView: View {
             return
         }
 
-        // Try to load .lrc file alongside the audio file
+        // 1. Try external .lrc file alongside the audio file
         let lrcURL = track.url.deletingPathExtension().appendingPathExtension("lrc")
         if let lrcText = try? String(contentsOf: lrcURL, encoding: .utf8) {
             let parsed = LrcParser.parse(lrcText: lrcText)
@@ -208,7 +208,17 @@ struct MainPlayerView: View {
             }
         }
 
-        // Fallback: show track info as multi-line display
+        // 2. Try embedded lyrics from audio file metadata (e.g. FLAC Vorbis LYRICS tag)
+        if let lrcText = track.lyrics, !lrcText.isEmpty {
+            let parsed = LrcParser.parse(lrcText: lrcText)
+            if !parsed.isEmpty {
+                lyrics = parsed
+                currentLyricIndex = 0
+                return
+            }
+        }
+
+        // 3. Fallback: show track info
         var fallbackLines: [LyricLine] = []
         fallbackLines.append(LyricLine(time: 0, text: track.title))
         if !track.artist.isEmpty, track.artist != NSLocalizedString("Unknown Artist", comment: "") {

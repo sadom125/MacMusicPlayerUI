@@ -11,6 +11,7 @@ struct MetadataParser {
         let album: String
         let artworkData: Data?
         let duration: TimeInterval
+        let lyrics: String?          // embedded LRC lyrics (FLAC Vorbis LYRICS tag)
     }
 
     /// Parse metadata from a local audio file URL.
@@ -41,13 +42,15 @@ struct MetadataParser {
         let album = findMetadataItem(metadata: metadata, key: AVMetadataKey.commonKeyAlbumName)
             ?? NSLocalizedString("Unknown Album", comment: "Default album name")
         let artworkData = findArtwork(metadata: metadata)
+        let lyrics = findLyrics(metadata: metadata)
 
         return Metadata(
             title: title,
             artist: artist,
             album: album,
             artworkData: artworkData,
-            duration: validDuration
+            duration: validDuration,
+            lyrics: lyrics
         )
     }
 
@@ -74,6 +77,23 @@ struct MetadataParser {
             if let value = item.value as? Data, value.count > 0 {
                 return value
             }
+        }
+        return nil
+    }
+
+    /// Extract embedded LRC lyrics from Vorbis comment (FLAC) or ID3 USLT tag.
+    private static func findLyrics(metadata: [AVMetadataItem]) -> String? {
+        // FLAC Vorbis comment stores lyrics with key "LYRICS" (no commonKey)
+        for item in metadata {
+            if let strKey = item.key as? String, strKey.uppercased() == "LYRICS",
+               let value = item.value as? String, !value.isEmpty {
+                return value
+            }
+        }
+        // Also try common key for lyrics (used by some formats)
+        if let item = metadata.first(where: { $0.commonKey?.rawValue == "lyrics" }),
+           let value = item.value as? String, !value.isEmpty {
+            return value
         }
         return nil
     }
