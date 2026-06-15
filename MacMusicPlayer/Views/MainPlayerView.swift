@@ -49,9 +49,6 @@ struct MainPlayerView: View {
 
             // === Auto-hiding Bottom Controls ===
             VStack(spacing: 0) {
-                // Glow edge that fades in with controls
-                controlGlow
-
                 // Control bar
                 controlBar
                     .padding(.horizontal, 32)
@@ -93,21 +90,6 @@ struct MainPlayerView: View {
     }
 
     // MARK: - Control Glow
-
-    /// Subtle glow gradient above the controls, visible when controls are shown.
-    private var controlGlow: some View {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color.tnAccent.opacity(0.0),
-                Color.tnAccent.opacity(0.06),
-                Color.tnAccent.opacity(0.03),
-            ]),
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 40)
-    }
-
     // MARK: - Mouse Tracking
 
     private func startMouseTracking() {

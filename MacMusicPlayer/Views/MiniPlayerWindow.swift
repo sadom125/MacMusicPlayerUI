@@ -13,8 +13,8 @@ class MiniPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 270, height: 130),
-            styleMask: [.titled, .nonactivatingPanel, .fullSizeContentView],
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 130),
+            styleMask: [.nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -24,8 +24,8 @@ class MiniPlayerWindow: NSPanel {
         self.titleVisibility = .hidden
         self.titlebarAppearsTransparent = true
         self.isMovableByWindowBackground = true
-        self.isOpaque = false
-        self.backgroundColor = .clear
+        self.isOpaque = true
+        self.backgroundColor = NSColor(red: 0.031, green: 0.031, blue: 0.055, alpha: 1)
         self.hasShadow = true
         self.ignoresMouseEvents = false
         self.acceptsMouseMovedEvents = true
