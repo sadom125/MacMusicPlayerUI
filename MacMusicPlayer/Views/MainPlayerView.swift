@@ -34,17 +34,6 @@ struct MainPlayerView: View {
         return data
     }
 
-    /// Background view that fills safely behind the VStack content.
-    private var albumArtBackground: some View {
-        AlbumArtBackground(
-            artworkData: currentArtworkData,
-            trackID: player.currentTrack?.id,
-            isAnimating: player.isPlaying
-        )
-        .clipped()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -78,7 +67,14 @@ struct MainPlayerView: View {
             .opacity(controlsVisible ? 1 : 0)
             .animation(.easeOut(duration: 0.5), value: controlsVisible)
         }
-        .background(albumArtBackground)
+        .background(
+            AlbumArtBackground(
+                artworkData: currentArtworkData,
+                trackID: player.currentTrack?.id,
+                isAnimating: player.isPlaying
+            )
+            .ignoresSafeArea()
+        )
         .onAppear {
             loadLyrics()
             startMouseTracking()

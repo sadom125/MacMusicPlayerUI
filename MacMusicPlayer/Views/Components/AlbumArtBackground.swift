@@ -9,17 +9,11 @@ struct AlbumArtBackground: View {
 
     @State private var breathe: Bool = false
 
-    /// Create NSImage directly from data — works because this runs in the view body on main thread.
-    private var currentImage: NSImage? {
-        guard let data = artworkData else { return nil }
-        return NSImage(data: data)
-    }
-
     var body: some View {
         ZStack {
             // Album art image — semi-transparent so glass effect shows through
-            if let image = currentImage {
-                Image(nsImage: image)
+            if let data = artworkData, let nsImage = NSImage(data: data) {
+                Image(nsImage: nsImage)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fill)
@@ -31,8 +25,8 @@ struct AlbumArtBackground: View {
             }
 
             // Ambient glow overlay (breathing animation)
-            if let image = currentImage {
-                Image(nsImage: image)
+            if let data = artworkData, let nsImage = NSImage(data: data) {
+                Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .blur(radius: 60)
