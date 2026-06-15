@@ -4,12 +4,21 @@ import SwiftUI
 /// Layout:
 ///   - Top: (empty — cover is background)
 ///   - Center: LyricsView
-///   - Bottom: Control bar + PlaylistPanel (collapsible)
+///   - Bottom: Control bar + PlaylistPanel (collapsible, auto-hides during playback)
 struct MainPlayerView: View {
     @ObservedObject var player: PlayerManager
     @State private var showPlaylist: Bool = false
     @State private var lyrics: [LyricLine] = []
     @State private var currentLyricIndex: Int = 0
+
+    // MARK: - Auto-hide controls
+
+    @State private var controlsVisible: Bool = true
+    @State private var lastMouseActivity: Date = Date()
+    @State private var mouseMonitor: Any? = nil
+    @State private var idleTimer: Timer? = nil
+    private let idleThreshold: TimeInterval = 3.0
+    private let idleCheckInterval: TimeInterval = 0.5
 
     /// Artwork from Track model, falling back to synchronous FLAC scan.
     private var currentArtworkData: Data? {
@@ -30,7 +39,6 @@ struct MainPlayerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Spacer pushes content down
             Spacer()
 
             // === Lyrics Section ===
@@ -39,36 +47,100 @@ struct MainPlayerView: View {
 
             Spacer()
 
-            // === Bottom Control Bar ===
-            controlBar
-                .padding(.horizontal, 32)
-                .padding(.bottom, 8)
+            // === Auto-hiding Bottom Controls ===
+            VStack(spacing: 0) {
+                // Glow edge that fades in with controls
+                controlGlow
 
-            // === Playlist Panel ===
-            if showPlaylist {
-                PlaylistPanel(
-                    tracks: player.playlist,
-                    currentTrackID: player.currentTrack?.id,
-                    onTrackTap: { index in
-                        player.playTrack(at: index)
-                    }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                // Control bar
+                controlBar
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 8)
+
+                // Playlist panel
+                if showPlaylist {
+                    PlaylistPanel(
+                        tracks: player.playlist,
+                        currentTrackID: player.currentTrack?.id,
+                        onTrackTap: { index in
+                            player.playTrack(at: index)
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .offset(y: controlsVisible ? 0 : 110)
+            .opacity(controlsVisible ? 1 : 0)
+            .animation(.easeOut(duration: 0.5), value: controlsVisible)
         }
         .background(albumArtBackground)
         .onAppear {
             loadLyrics()
+            startMouseTracking()
+        }
+        .onDisappear {
+            stopMouseTracking()
         }
         .onChange(of: player.currentTrack) { _ in
             loadLyrics()
-            // Update window title to show current track name
             if let window = NSApplication.shared.keyWindow as? MainPlayerWindow {
                 window.updateTitle()
             }
         }
         .onChange(of: player.currentTime) { newTime in
             updateLyricIndex(time: newTime)
+        }
+    }
+
+    // MARK: - Control Glow
+
+    /// Subtle glow gradient above the controls, visible when controls are shown.
+    private var controlGlow: some View {
+        LinearGradient(
+            gradient: Gradient(colors: [
+                Color.tnAccent.opacity(0.0),
+                Color.tnAccent.opacity(0.06),
+                Color.tnAccent.opacity(0.03),
+            ]),
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: 40)
+    }
+
+    // MARK: - Mouse Tracking
+
+    private func startMouseTracking() {
+        // Monitor mouse movement anywhere in the window
+        let monitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]) { event in
+            self.onMouseActivity()
+            return event
+        }
+        mouseMonitor = monitor
+
+        // Periodic timer to check idle timeout
+        idleTimer = Timer.scheduledTimer(withTimeInterval: idleCheckInterval, repeats: true) { _ in
+            let idle = Date().timeIntervalSince(self.lastMouseActivity)
+            let shouldHide = self.player.isPlaying && idle > self.idleThreshold
+            if self.controlsVisible == shouldHide {
+                self.controlsVisible = !shouldHide
+            }
+        }
+    }
+
+    private func stopMouseTracking() {
+        if let monitor = mouseMonitor as? AnyObject {
+            NSEvent.removeMonitor(monitor)
+        }
+        mouseMonitor = nil
+        idleTimer?.invalidate()
+        idleTimer = nil
+    }
+
+    private func onMouseActivity() {
+        lastMouseActivity = Date()
+        if !controlsVisible {
+            controlsVisible = true
         }
     }
 
