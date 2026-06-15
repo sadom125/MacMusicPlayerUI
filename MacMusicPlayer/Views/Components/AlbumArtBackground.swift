@@ -15,10 +15,7 @@ struct AlbumArtBackground: View {
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
             } else {
-                // Fallback: pure dark background
                 Color(red: 0.031, green: 0.031, blue: 0.055)
             }
 
@@ -27,14 +24,11 @@ struct AlbumArtBackground: View {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
                     .blur(radius: 60)
                     .opacity(0.25)
                     .scaleEffect(breathe ? 1.04 : 1.0)
                     .blendMode(.screen)
             } else {
-                // Fallback accent glow
                 Color.tnAccent
                     .opacity(0.12)
                     .blur(radius: 80)
@@ -52,7 +46,6 @@ struct AlbumArtBackground: View {
                 endPoint: .bottom
             )
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) {
                 breathe = true

@@ -18,43 +18,45 @@ struct MainPlayerView: View {
         return MetadataParser.parseArtworkDirect(from: url)
     }
 
+    /// Background view that fills safely behind the VStack content.
+    private var albumArtBackground: some View {
+        AlbumArtBackground(
+            artworkData: currentArtworkData,
+            isAnimating: player.isPlaying
+        )
+        .clipped()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     var body: some View {
-        ZStack {
-            // Album art background
-            AlbumArtBackground(
-                artworkData: currentArtworkData,
-                isAnimating: player.isPlaying
-            )
+        VStack(spacing: 0) {
+            // Spacer pushes content down
+            Spacer()
 
-            VStack(spacing: 0) {
-                // Spacer pushes content down
-                Spacer()
+            // === Lyrics Section ===
+            LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+                .frame(maxHeight: .infinity)
 
-                // === Lyrics Section ===
-                LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
-                    .frame(maxHeight: .infinity)
+            Spacer()
 
-                Spacer()
+            // === Bottom Control Bar ===
+            controlBar
+                .padding(.horizontal, 32)
+                .padding(.bottom, 8)
 
-                // === Bottom Control Bar ===
-                controlBar
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 8)
-
-                // === Playlist Panel ===
-                if showPlaylist {
-                    PlaylistPanel(
-                        tracks: player.playlist,
-                        currentTrackID: player.currentTrack?.id,
-                        onTrackTap: { index in
-                            player.playTrack(at: index)
-                        }
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+            // === Playlist Panel ===
+            if showPlaylist {
+                PlaylistPanel(
+                    tracks: player.playlist,
+                    currentTrackID: player.currentTrack?.id,
+                    onTrackTap: { index in
+                        player.playTrack(at: index)
+                    }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .background(Color.tnBackground)
+        .background(albumArtBackground)
         .onAppear {
             loadLyrics()
         }
