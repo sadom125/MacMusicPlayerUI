@@ -5,6 +5,7 @@ import AppKit
 class MainPlayerWindow: NSWindow {
     let hostingView: NSHostingView<AnyView>
     private let playerManager: PlayerManager
+    private var glassView: NSVisualEffectView?
 
     init(playerManager: PlayerManager) {
         self.playerManager = playerManager
@@ -28,7 +29,8 @@ class MainPlayerWindow: NSWindow {
 
         self.titlebarAppearsTransparent = true
         self.isOpaque = false
-        self.backgroundColor = .clear
+        // Use dark background to avoid black flash when app reactivates
+        self.backgroundColor = NSColor(red: 0.031, green: 0.031, blue: 0.055, alpha: 1.0)
         self.hasShadow = true
 
         // Force title text to be visible (white) regardless of background
@@ -38,20 +40,21 @@ class MainPlayerWindow: NSWindow {
         }
 
         // Glass background — NSVisualEffectView as the window's底层
-        let glassView = NSVisualEffectView()
-        glassView.material = .hudWindow
-        glassView.blendingMode = .behindWindow
-        glassView.state = .active
-        glassView.isEmphasized = false
-        glassView.autoresizingMask = [.width, .height]
-        glassView.frame = self.contentView?.bounds ?? .zero
+        let glass = NSVisualEffectView()
+        glass.material = .hudWindow
+        glass.blendingMode = .behindWindow
+        glass.state = .active
+        glass.isEmphasized = false
+        glass.autoresizingMask = [.width, .height]
+        glass.frame = self.contentView?.bounds ?? .zero
+        self.glassView = glass
 
         // Hosting view sits on top of glass
-        hosting.frame = glassView.bounds
+        hosting.frame = glass.bounds
         hosting.autoresizingMask = [.width, .height]
-        glassView.addSubview(hosting)
+        glass.addSubview(hosting)
 
-        self.contentView = glassView
+        self.contentView = glass
 
         // Disable fullscreen to avoid macOS _NSExitFullScreenTransitionController crash.
         // Green button will zoom (maximize) instead of entering fullscreen.
@@ -60,6 +63,15 @@ class MainPlayerWindow: NSWindow {
         // Apply saved window opacity
         let savedOpacity = UserDefaults.standard.double(forKey: "windowOpacity")
         self.alphaValue = CGFloat(savedOpacity > 0 ? savedOpacity : 1.0)
+
+        // Fix: force glass view to re-render when app comes back to foreground.
+        // NSVisualEffectView briefly shows black after app reactivation.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
 
         self.center()
         self.acceptsMouseMovedEvents = true
@@ -79,6 +91,14 @@ class MainPlayerWindow: NSWindow {
         }
     }
 
+    /// Force glass view to re-render when app reactivates — fixes black flash.
+    @objc private func appDidBecomeActive() {
+        // Force immediate synchronous redraw instead of deferred
+        glassView?.displayIfNeeded()
+        hostingView.displayIfNeeded()
+        self.displayIfNeeded()
+    }
+
     /// Update the SwiftUI content without replacing the hosting view (preserves glass background).
     func updateContent(_ view: some View) {
         hostingView.rootView = AnyView(view.environment(\.colorScheme, .dark))
@@ -93,6 +113,10 @@ class MainPlayerWindow: NSWindow {
         }
         // Force dark appearance so title text is white on our custom dark background
         self.appearance = NSAppearance(named: .darkAqua)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
 
