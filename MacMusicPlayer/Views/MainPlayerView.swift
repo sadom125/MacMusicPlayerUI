@@ -11,11 +11,18 @@ struct MainPlayerView: View {
     @State private var lyrics: [LyricLine] = []
     @State private var currentLyricIndex: Int = 0
 
+    /// Artwork from Track model, falling back to synchronous FLAC scan.
+    private var currentArtworkData: Data? {
+        if let data = player.currentTrack?.albumArtData { return data }
+        guard let url = player.currentTrack?.url else { return nil }
+        return MetadataParser.parseArtworkDirect(from: url)
+    }
+
     var body: some View {
         ZStack {
             // Album art background
             AlbumArtBackground(
-                artworkData: player.currentTrack?.albumArtData,
+                artworkData: currentArtworkData,
                 isAnimating: player.isPlaying
             )
 

@@ -127,4 +127,31 @@ struct MetadataParser {
         }
         return nil
     }
+
+    /// Synchronously read album art (METADATA_BLOCK_PICTURE) from a FLAC file.
+    /// Used as a direct fallback when async AVAsset metadata is not yet available.
+    static func parseArtworkDirect(from url: URL) -> Data? {
+        guard url.pathExtension.lowercased() == "flac" else { return nil }
+        guard let fileHandle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? fileHandle.close() }
+
+        guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int else { return nil }
+        let readSize = min(1024 * 512, size)
+        guard let data = try? fileHandle.read(upToCount: readSize), data.count > 42 else { return nil }
+
+        // Search for JPEG/PNG magic bytes in the raw FLAC data
+        // JPEG magic: FF D8 FF
+        // PNG magic:  89 50 4E 47
+        for i in 0..<(data.count - 3) {
+            if data[i] == 0xFF, data[i+1] == 0xD8, data[i+2] == 0xFF {
+                return Data(data[i..<data.count])
+            }
+        }
+        for i in 0..<(data.count - 4) {
+            if data[i] == 0x89, data[i+1] == 0x50, data[i+2] == 0x4E, data[i+3] == 0x47 {
+                return Data(data[i..<data.count])
+            }
+        }
+        return nil
+    }
 }

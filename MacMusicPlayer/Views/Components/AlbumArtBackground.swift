@@ -13,8 +13,11 @@ struct AlbumArtBackground: View {
             if let data = artworkData, let nsImage = NSImage(data: data) {
                 Image(nsImage: nsImage)
                     .resizable()
+                    .interpolation(.high)
                     .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
+                    .ignoresSafeArea()
             } else {
                 // Fallback: pure dark background
                 Color(red: 0.031, green: 0.031, blue: 0.055)
@@ -25,6 +28,7 @@ struct AlbumArtBackground: View {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                     .blur(radius: 60)
                     .opacity(0.25)
