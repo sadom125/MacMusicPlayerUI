@@ -17,9 +17,16 @@
 ## 设计风格
 
 - 🎵 封面作为全幅背景，底部渐变淡出 + 环境光晕呼吸动画
+
 - 📝 居中 LRC 滚动歌词，active 行高亮 + `past/near/active` 三层透明度
+
 - 🖼️ 支持 FLAC 内嵌封面/歌词的同步字节扫描（无需等待异步解析）
+
 - 🎛️ 控制栏 3 秒无操作自动淡出隐藏，鼠标经过恢复
+
+  <img src="/Users/hang/Library/Application Support/typora-user-images/image-20260615193249639.png" alt="image-20260615193249639" style="zoom:50%;" />
+
+  ![image-20260615193308612](/Users/hang/Library/Application Support/typora-user-images/image-20260615193308612.png)
 
 ## 功能
 
