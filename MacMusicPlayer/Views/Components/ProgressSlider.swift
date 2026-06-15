@@ -9,6 +9,7 @@ struct ProgressSlider: View {
     @State private var isDragging: Bool = false
     @State private var dragTime: TimeInterval = 0
     @State private var breathe: Bool = false
+    @ObservedObject var themeManager = ThemeManager.shared
 
     private var effectiveDuration: TimeInterval {
         if duration > 0 { return duration }
@@ -37,7 +38,7 @@ struct ProgressSlider: View {
 
                     // Glow behind fill bar — breathing blue
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.tnAccent.opacity(breathe ? 0.3 : 0.1))
+                        .fill(ThemeManager.shared.accent.opacity(breathe ? 0.3 : 0.1))
                         .frame(width: max(0, geo.size.width * CGFloat(progress)), height: 6)
                         .blur(radius: 6)
 
@@ -46,8 +47,8 @@ struct ProgressSlider: View {
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    Color.tnAccent,
-                                    Color.tnAccent.opacity(0.25)
+                                    ThemeManager.shared.accent,
+                                    ThemeManager.shared.accent.opacity(0.25)
                                 ]),
                                 startPoint: .leading,
                                 endPoint: .trailing
@@ -57,9 +58,9 @@ struct ProgressSlider: View {
 
                     // Thumb — breathing glow shadow
                     Circle()
-                        .fill(Color.tnAccent)
+                        .fill(ThemeManager.shared.accent)
                         .frame(width: 12, height: 12)
-                        .shadow(color: Color.tnAccent.opacity(breathe ? 0.6 : 0.25), radius: breathe ? 6 : 3)
+                        .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.6 : 0.25), radius: breathe ? 6 : 3)
                         .offset(x: max(0, geo.size.width * CGFloat(progress) - 6))
                         .opacity(isDragging ? 1 : 0.6)
                 }

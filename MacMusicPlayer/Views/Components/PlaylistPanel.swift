@@ -37,17 +37,19 @@ private struct PlaylistRow: View {
     let duration: TimeInterval
     let isActive: Bool
 
+    @ObservedObject var themeManager = ThemeManager.shared
+
     var body: some View {
         HStack(spacing: 8) {
             Text(String(format: "%02d", index))
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(isActive ? Color.accentColor : .white.opacity(0.35))
+                .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.35))
                 .frame(width: 24, alignment: .trailing)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 13))
-                    .foregroundColor(isActive ? Color.accentColor : .white.opacity(0.7))
+                    .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.7))
                     .lineLimit(1)
                 if !artist.isEmpty {
                     Text(artist)
@@ -61,11 +63,11 @@ private struct PlaylistRow: View {
 
             Text(formatDuration(duration))
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(isActive ? Color.accentColor : .white.opacity(0.35))
+                .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.35))
         }
         .padding(.vertical, 5)
         .padding(.horizontal, 8)
-        .background(isActive ? Color.accentColor.opacity(0.05) : Color.clear)
+        .background(isActive ? themeManager.accent.opacity(0.05) : Color.clear)
         .cornerRadius(6)
     }
 

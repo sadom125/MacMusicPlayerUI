@@ -65,6 +65,7 @@ struct LyricLineView: View {
     let proximity: LyricsView.Proximity
 
     @State private var breathe: Bool = false
+    @ObservedObject var themeManager = ThemeManager.shared
 
     var body: some View {
         Text(text)
@@ -76,7 +77,7 @@ struct LyricLineView: View {
             .background {
                 if isActive {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.tnAccent.opacity(breathe ? 0.08 : 0.03))
+                        .fill(ThemeManager.shared.accent.opacity(breathe ? 0.08 : 0.03))
                 }
             }
             .cornerRadius(8)

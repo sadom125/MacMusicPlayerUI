@@ -15,6 +15,7 @@ struct AlbumArtBackground: View {
     var isAnimating: Bool = false
 
     @State private var breathe: Bool = false
+    @ObservedObject var themeManager = ThemeManager.shared
     /// When true, artwork is completely removed (not just hidden)
     /// so SwiftUI destroys the Image view. After zoom completes,
     /// it's recreated at the correct size.
@@ -43,7 +44,7 @@ struct AlbumArtBackground: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color.accentColor.opacity(0.15 * (breathe ? 1 : 0.5)),
+                                    ThemeManager.shared.accent.opacity(0.15 * (breathe ? 1 : 0.5)),
                                     Color.clear,
                                 ],
                                 center: .center,

@@ -7,6 +7,7 @@ import SwiftUI
 ///   - Bottom: Control bar + PlaylistPanel (collapsible, auto-hides during playback)
 struct MainPlayerView: View {
     @ObservedObject var player: PlayerManager
+    @ObservedObject var themeManager = ThemeManager.shared
     @State private var showPlaylist: Bool = false
     @State private var lyrics: [LyricLine] = []
     @State private var currentLyricIndex: Int = 0
@@ -214,11 +215,11 @@ struct MainPlayerView: View {
                 }) {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(showPlaylist ? Color.tnAccent : .white.opacity(0.5))
+                        .foregroundColor(showPlaylist ? PlayerTheme.current.accent : .white.opacity(0.5))
                         .frame(width: 34, height: 34)
                         .background(
                             showPlaylist
-                                ? Color.tnAccent.opacity(0.08)
+                                ? PlayerTheme.current.accent.opacity(0.08)
                                 : Color.white.opacity(0.04)
                         )
                         .cornerRadius(8)
@@ -233,17 +234,31 @@ struct MainPlayerView: View {
                 }) {
                     Image(systemName: showAlbumArt ? "photo" : "xmark.rectangle")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(showAlbumArt ? Color.tnAccent : .white.opacity(0.5))
+                        .foregroundColor(showAlbumArt ? PlayerTheme.current.accent : .white.opacity(0.5))
                         .frame(width: 34, height: 34)
                         .background(
                             showAlbumArt
-                                ? Color.tnAccent.opacity(0.08)
+                                ? PlayerTheme.current.accent.opacity(0.08)
                                 : Color.white.opacity(0.04)
                         )
                         .cornerRadius(8)
                 }
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
                 .help("Toggle album art background")
+
+                // Theme toggle
+                Button(action: { themeManager.cycle() }) {
+                    Circle()
+                        .fill(themeManager.accent)
+                        .frame(width: 14, height: 14)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.white.opacity(0.04))
+                        )
+                }
+                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
+                .help("Theme: \(themeManager.themeName)")
 
                 // Mini player toggle
                 Button(action: switchToMiniPlayer) {
@@ -317,9 +332,9 @@ struct MainPlayerView: View {
         }) {
             Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 18))
-                .foregroundColor(Color.tnAccent)
+                .foregroundColor(PlayerTheme.current.accent)
                 .frame(width: 48, height: 48)
-                .background(Color.tnAccent.opacity(0.1))
+                .background(PlayerTheme.current.accent.opacity(0.1))
                 .clipShape(Circle())
         }
         .buttonStyle(PressableButtonStyle(scaleDown: 0.88))

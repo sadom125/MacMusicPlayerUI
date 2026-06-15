@@ -3,6 +3,7 @@ import SwiftUI
 /// Mini floating player view — compact, always-on-top
 struct MiniPlayerView: View {
     @ObservedObject var player: PlayerManager
+    @ObservedObject var themeManager = ThemeManager.shared
     @State private var cachedLyrics: [LyricLine] = []
     @State private var cachedTrackID: UUID? = nil
 
@@ -67,7 +68,7 @@ struct MiniPlayerView: View {
                             .lineLimit(1)
                         Text(player.currentTrack?.artist ?? "")
                             .font(.system(size: 11))
-                            .foregroundColor(Color.tnAccent)
+                            .foregroundColor(themeManager.accent)
                             .lineLimit(1)
                     }
 
@@ -105,7 +106,7 @@ struct MiniPlayerView: View {
                             .fill(Color.white.opacity(0.03))
                             .frame(height: 2)
                         Rectangle()
-                            .fill(Color.tnAccent.opacity(0.4))
+                            .fill(themeManager.accent.opacity(0.4))
                             .frame(
                                 width: geo.size.width * progressRatio,
                                 height: 2
@@ -127,9 +128,9 @@ struct MiniPlayerView: View {
                     Button(action: { player.isPlaying ? player.pause() : player.play() }) {
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 20))
-                            .foregroundColor(Color.tnAccent)
+                            .foregroundColor(themeManager.accent)
                             .frame(width: 48, height: 48)
-                            .background(Color.tnAccent.opacity(0.08))
+                            .background(themeManager.accent.opacity(0.08))
                             .clipShape(Circle())
                     }
                     .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
