@@ -8,6 +8,7 @@ struct ProgressSlider: View {
 
     @State private var isDragging: Bool = false
     @State private var dragTime: TimeInterval = 0
+    @State private var breathe: Bool = false
 
     private var effectiveDuration: TimeInterval {
         if duration > 0 { return duration }
@@ -29,18 +30,24 @@ struct ProgressSlider: View {
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    // Track background - thicker
+                    // Track background
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.white.opacity(0.05))
                         .frame(height: 6)
 
-                    // Fill - thicker
+                    // Glow behind fill bar — breathing blue
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.tnAccent.opacity(breathe ? 0.3 : 0.1))
+                        .frame(width: max(0, geo.size.width * CGFloat(progress)), height: 6)
+                        .blur(radius: 6)
+
+                    // Fill bar
                     RoundedRectangle(cornerRadius: 3)
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    Color.accentColor,
-                                    Color.accentColor.opacity(0.25)
+                                    Color.tnAccent,
+                                    Color.tnAccent.opacity(0.25)
                                 ]),
                                 startPoint: .leading,
                                 endPoint: .trailing
@@ -48,11 +55,11 @@ struct ProgressSlider: View {
                         )
                         .frame(width: max(0, geo.size.width * CGFloat(progress)), height: 6)
 
-                    // Thumb - always visible, brighter when dragging
+                    // Thumb — breathing glow shadow
                     Circle()
-                        .fill(Color.accentColor)
+                        .fill(Color.tnAccent)
                         .frame(width: 12, height: 12)
-                        .shadow(color: Color.accentColor.opacity(0.35), radius: 4)
+                        .shadow(color: Color.tnAccent.opacity(breathe ? 0.6 : 0.25), radius: breathe ? 6 : 3)
                         .offset(x: max(0, geo.size.width * CGFloat(progress) - 6))
                         .opacity(isDragging ? 1 : 0.6)
                 }
@@ -82,6 +89,11 @@ struct ProgressSlider: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.white.opacity(0.4))
                 .frame(minWidth: 32, alignment: .trailing)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                breathe = true
+            }
         }
     }
 

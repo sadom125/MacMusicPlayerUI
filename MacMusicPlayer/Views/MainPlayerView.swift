@@ -11,6 +11,7 @@ struct MainPlayerView: View {
     @State private var lyrics: [LyricLine] = []
     @State private var currentLyricIndex: Int = 0
     @State private var artworkFallbackCache: [UUID: Data?] = [:]
+    @AppStorage("showAlbumArt") private var showAlbumArt: Bool = true
 
     // MARK: - Auto-hide controls
 
@@ -69,7 +70,7 @@ struct MainPlayerView: View {
         }
         .background(
             AlbumArtBackground(
-                artworkData: currentArtworkData,
+                artworkData: showAlbumArt ? currentArtworkData : nil,
                 trackID: player.currentTrack?.id,
                 isAnimating: player.isPlaying
             )
@@ -223,6 +224,26 @@ struct MainPlayerView: View {
                         .cornerRadius(8)
                 }
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
+
+                // Album art toggle
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showAlbumArt.toggle()
+                    }
+                }) {
+                    Image(systemName: showAlbumArt ? "photo" : "xmark.rectangle")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(showAlbumArt ? Color.tnAccent : .white.opacity(0.5))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            showAlbumArt
+                                ? Color.tnAccent.opacity(0.08)
+                                : Color.white.opacity(0.04)
+                        )
+                        .cornerRadius(8)
+                }
+                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
+                .help("Toggle album art background")
 
                 // Mini player toggle
                 Button(action: switchToMiniPlayer) {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Centered, immersive lyrics display.
-/// Active line is highlighted with larger font and subtle glow.
+/// Active line is highlighted with larger font and breathing glow.
 /// Past lines fade to near-invisible.
 struct LyricsView: View {
     let lyrics: [LyricLine]
@@ -64,6 +64,8 @@ struct LyricLineView: View {
     let isActive: Bool
     let proximity: LyricsView.Proximity
 
+    @State private var breathe: Bool = false
+
     var body: some View {
         Text(text)
             .font(isActive ? .system(size: 18, weight: .semibold) : .system(size: 14))
@@ -71,8 +73,20 @@ struct LyricLineView: View {
             .lineSpacing(6)
             .padding(.horizontal, 24)
             .padding(.vertical, isActive ? 8 : 3)
-            .background(isActive ? Color.accentColor.opacity(0.04) : Color.clear)
+            .background {
+                if isActive {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.tnAccent.opacity(breathe ? 0.08 : 0.03))
+                }
+            }
             .cornerRadius(8)
+            .shadow(color: .clear, radius: 0)
+            .onAppear {
+                guard isActive else { return }
+                withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                    breathe = true
+                }
+            }
     }
 
     private var foreground: Color {
