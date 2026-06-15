@@ -12,8 +12,20 @@ struct MainPlayerView: View {
     @State private var lyrics: [LyricLine] = []
     @State private var currentLyricIndex: Int = 0
     @State private var artworkFallbackCache: [UUID: Data?] = [:]
-    @AppStorage("showAlbumArt") private var showAlbumArt: Bool = true
+    @AppStorage("bgMode") private var bgMode: String = "albumArt"
     @AppStorage("windowOpacity") private var windowOpacity: Double = 1.0
+    @State private var showBgPicker: Bool = false
+
+    /// Background mode options
+    private let bgOptions: [(id: String, label: String, color: Color?)] = [
+        ("none", "无背景", nil),
+        ("albumArt", "专辑封面", nil),
+        ("solid:#08080e", "深黑", Color(red: 0.031, green: 0.031, blue: 0.055)),
+        ("solid:#0e1628", "深蓝", Color(red: 0.055, green: 0.086, blue: 0.157)),
+        ("solid:#1a0e28", "深紫", Color(red: 0.102, green: 0.055, blue: 0.157)),
+        ("solid:#1e1e1e", "深灰", Color(red: 0.118, green: 0.118, blue: 0.118)),
+        ("solid:#0a1a1a", "青绿", Color(red: 0.039, green: 0.102, blue: 0.102)),
+    ]
 
     // MARK: - Auto-hide controls
 
@@ -35,6 +47,13 @@ struct MainPlayerView: View {
         artworkFallbackCache[track.id] = data
         NSLog("[Artwork] FLAC scan result: %d bytes", data?.count ?? 0)
         return data
+    }
+
+    /// Resolve solid background color from bgMode string
+    private var solidBgColor: Color? {
+        guard bgMode.hasPrefix("solid:") else { return nil }
+        let hex = String(bgMode.dropFirst("solid:".count))
+        return Color(hex: hex)
     }
 
     var body: some View {
@@ -72,9 +91,10 @@ struct MainPlayerView: View {
         }
         .background(
             AlbumArtBackground(
-                artworkData: showAlbumArt ? currentArtworkData : nil,
+                artworkData: bgMode == "none" ? nil : currentArtworkData,
                 trackID: player.currentTrack?.id,
-                isAnimating: player.isPlaying
+                isAnimating: player.isPlaying,
+                solidColor: solidBgColor
             )
             .ignoresSafeArea()
         )
@@ -227,25 +247,61 @@ struct MainPlayerView: View {
                 }
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
 
-                // Album art toggle
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        showAlbumArt.toggle()
-                    }
-                }) {
-                    Image(systemName: showAlbumArt ? "photo" : "xmark.rectangle")
+                // Background mode picker
+                Button(action: { showBgPicker.toggle() }) {
+                    Image(systemName: bgMode == "none" ? "square.dashed" : "photo")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(showAlbumArt ? themeManager.accent : .white.opacity(0.5))
+                        .foregroundColor(bgMode == "none" ? .white.opacity(0.5) : themeManager.accent)
                         .frame(width: 34, height: 34)
                         .background(
-                            showAlbumArt
-                                ? themeManager.accent.opacity(0.08)
-                                : Color.white.opacity(0.04)
+                            bgMode == "none"
+                                ? Color.white.opacity(0.04)
+                                : themeManager.accent.opacity(0.08)
                         )
                         .cornerRadius(8)
                 }
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
-                .help("Toggle album art background")
+                .popover(isPresented: $showBgPicker, arrowEdge: .top) {
+                    VStack(spacing: 0) {
+                        ForEach(bgOptions, id: \.id) { option in
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    bgMode = option.id
+                                }
+                                showBgPicker = false
+                            }) {
+                                HStack(spacing: 8) {
+                                    if let color = option.color {
+                                        Circle().fill(color).frame(width: 12, height: 12)
+                                            .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
+                                    } else if option.id == "none" {
+                                        Image(systemName: "square.dashed").font(.system(size: 11))
+                                    } else {
+                                        Image(systemName: "photo").font(.system(size: 11))
+                                    }
+                                    Text(option.label)
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white.opacity(0.8))
+                                    Spacer()
+                                    if bgMode == option.id {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(themeManager.accent)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            if option.id != bgOptions.last?.id {
+                                Divider().padding(.horizontal, 12)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .frame(width: 160)
+                }
 
                 // Theme toggle
                 Button(action: { themeManager.cycle() }) {
@@ -442,4 +498,31 @@ struct MainPlayerView: View {
     }
 }
 
+// MARK: - Color Hex Extension
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
+}
 

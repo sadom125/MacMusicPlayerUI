@@ -3,8 +3,7 @@
 //  MacMusicPlayer
 //
 //  Full-bleed album art background with breathing glow.
-//  Destroys artwork during window zoom to avoid layout glitch,
-//  then recreates at the correct maximized size.
+//  Supports album art or solid color background modes.
 //
 
 import SwiftUI
@@ -13,19 +12,21 @@ struct AlbumArtBackground: View {
     let artworkData: Data?
     let trackID: UUID?
     var isAnimating: Bool = false
+    var solidColor: Color? = nil
 
     @State private var breathe: Bool = false
     @ObservedObject var themeManager = ThemeManager.shared
-    /// When true, artwork is completely removed (not just hidden)
-    /// so SwiftUI destroys the Image view. After zoom completes,
-    /// it's recreated at the correct size.
     @State private var artworkDestroyed: Bool = false
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Album art — destroyed during zoom, recreated after
-                if !artworkDestroyed, let data = artworkData, let nsImage = NSImage(data: data) {
+                // Solid color background mode
+                if let color = solidColor {
+                    color
+                }
+                // Album art mode — destroyed during zoom, recreated after
+                else if !artworkDestroyed, let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .interpolation(.high)
@@ -38,13 +39,13 @@ struct AlbumArtBackground: View {
                     Color.clear
                 }
 
-                // Breathing glow overlay
-                if !artworkDestroyed, artworkData != nil {
+                // Breathing glow overlay — only for album art mode
+                if solidColor == nil, !artworkDestroyed, artworkData != nil {
                     Circle()
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    ThemeManager.shared.accent.opacity(0.15 * (breathe ? 1 : 0.5)),
+                                    themeManager.accent.opacity(0.15 * (breathe ? 1 : 0.5)),
                                     Color.clear,
                                 ],
                                 center: .center,
@@ -82,21 +83,10 @@ struct AlbumArtBackground: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .windowWillZoom)) { _ in
-            // Destroy artwork BEFORE zoom animation starts
             artworkDestroyed = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .windowDidZoom)) { _ in
-            // Recreate artwork after zoom animation completes
             artworkDestroyed = false
         }
     }
-}
-
-#Preview {
-    ZStack {
-        AlbumArtBackground(artworkData: nil, trackID: nil)
-        Text("Album Art Background")
-            .foregroundColor(.white)
-    }
-    .frame(width: 600, height: 400)
 }
