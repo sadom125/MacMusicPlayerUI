@@ -44,14 +44,16 @@ struct PlaylistPanel: View {
             }
         }
         .frame(width: 280)
+        .frame(maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(.ultraThinMaterial)
                 .opacity(0.85)
         )
-        .offset(x: 12) // Extend outside window
+        .offset(x: 12)
         .padding(.trailing, 12)
-        .padding(.bottom, 130)
+        .padding(.bottom, 100)
+        .padding(.top, 30) // Below title bar
     }
 }
 

@@ -30,19 +30,23 @@ struct ProgressSlider: View {
                 .frame(minWidth: 32, alignment: .leading)
 
             GeometryReader { geo in
+                let thumbSize: CGFloat = 14
+                let trackHeight: CGFloat = 6
+                let thumbOffset = thumbSize / 2
+
                 ZStack(alignment: .leading) {
                     // Track background
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.white.opacity(0.05))
-                        .frame(height: 6)
-                        .offset(y: 11) // Center vertically in 28px frame
+                        .frame(height: trackHeight)
+                        .offset(y: (geo.size.height - trackHeight) / 2)
 
                     // Glow behind fill bar — breathing blue
                     RoundedRectangle(cornerRadius: 3)
                         .fill(ThemeManager.shared.accent.opacity(breathe ? 0.3 : 0.1))
-                        .frame(width: max(0, geo.size.width * CGFloat(progress) - 7), height: 6)
+                        .frame(width: max(0, geo.size.width * CGFloat(progress) - thumbOffset), height: trackHeight)
                         .blur(radius: 6)
-                        .offset(y: 11)
+                        .offset(y: (geo.size.height - trackHeight) / 2)
 
                     // Fill bar
                     RoundedRectangle(cornerRadius: 3)
@@ -56,20 +60,20 @@ struct ProgressSlider: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(0, geo.size.width * CGFloat(progress) - 7), height: 6)
-                        .offset(y: 11)
+                        .frame(width: max(0, geo.size.width * CGFloat(progress) - thumbOffset), height: trackHeight)
+                        .offset(y: (geo.size.height - trackHeight) / 2)
 
                     // Thumb — glass effect with breathing glow
                     Circle()
                         .fill(.ultraThinMaterial)
-                        .frame(width: 14, height: 14)
+                        .frame(width: thumbSize, height: thumbSize)
                         .overlay(
                             Circle()
                                 .fill(ThemeManager.shared.accent.opacity(0.8))
                                 .frame(width: 8, height: 8)
                         )
                         .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.5 : 0.2), radius: breathe ? 4 : 2)
-                        .offset(x: max(0, geo.size.width * CGFloat(progress) - 7), y: 7)
+                        .offset(x: max(0, geo.size.width * CGFloat(progress) - thumbOffset), y: (geo.size.height - thumbSize) / 2)
                         .scaleEffect(isDragging ? 1.2 : 1.0)
                 }
                 .gesture(
