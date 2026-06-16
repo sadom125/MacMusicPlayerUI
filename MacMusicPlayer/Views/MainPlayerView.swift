@@ -124,9 +124,10 @@ struct MainPlayerView: View {
         mouseMonitor = monitor
 
         // Periodic timer to check idle timeout
+        // Don't auto-hide when playlist is open (user might be scrolling)
         idleTimer = Timer.scheduledTimer(withTimeInterval: idleCheckInterval, repeats: true) { _ in
             let idle = Date().timeIntervalSince(self.lastMouseActivity)
-            let shouldHide = self.player.isPlaying && idle > self.idleThreshold
+            let shouldHide = self.player.isPlaying && !self.showPlaylist && idle > self.idleThreshold
             if self.controlsVisible == shouldHide {
                 self.controlsVisible = !shouldHide
             }
