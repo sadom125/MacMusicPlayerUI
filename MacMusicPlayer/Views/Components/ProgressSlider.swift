@@ -56,13 +56,18 @@ struct ProgressSlider: View {
                         )
                         .frame(width: max(0, geo.size.width * CGFloat(progress)), height: 6)
 
-                    // Thumb — breathing glow shadow
+                    // Thumb — glass effect with breathing glow
                     Circle()
-                        .fill(ThemeManager.shared.accent)
-                        .frame(width: 12, height: 12)
-                        .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.6 : 0.25), radius: breathe ? 6 : 3)
-                        .offset(x: max(0, geo.size.width * CGFloat(progress) - 6))
-                        .opacity(isDragging ? 1 : 0.6)
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 14, height: 14)
+                        .overlay(
+                            Circle()
+                                .fill(ThemeManager.shared.accent.opacity(0.8))
+                                .frame(width: 8, height: 8)
+                        )
+                        .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.5 : 0.2), radius: breathe ? 4 : 2)
+                        .offset(x: max(0, geo.size.width * CGFloat(progress) - 7))
+                        .scaleEffect(isDragging ? 1.2 : 1.0)
                 }
                 .gesture(
                     DragGesture(minimumDistance: 0)

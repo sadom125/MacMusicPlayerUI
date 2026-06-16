@@ -201,50 +201,39 @@ struct MainPlayerView: View {
     // MARK: - Control Bar
 
     private var controlBar: some View {
-        GeometryReader { geo in
-            HStack(spacing: 14) {
+        VStack(spacing: 8) {
+            // Top row: Progress slider with glass background
+            ProgressSlider(
+                currentTime: Binding(
+                    get: { player.currentTime },
+                    set: { player.currentTime = $0 }
+                ),
+                duration: player.duration,
+                onSeek: { time in player.seek(to: time) }
+            )
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.6)
+            )
+
+            // Bottom row: Controls (evenly distributed)
+            HStack(spacing: 0) {
                 // Playback controls
-                HStack(spacing: 10) {
+                HStack(spacing: 16) {
                     controlButton(icon: "backward.fill", size: 16) { player.playPrevious() }
                     playPauseButton
                     controlButton(icon: "forward.fill", size: 16) { player.playNext() }
                 }
 
-                // Progress — hidden when window is too narrow
-                if geo.size.width >= 420 {
-                    ProgressSlider(
-                        currentTime: Binding(
-                            get: { player.currentTime },
-                            set: { player.currentTime = $0 }
-                        ),
-                        duration: player.duration,
-                        onSeek: { time in player.seek(to: time) }
-                    )
-                }
-
-                Spacer(minLength: 4)
+                Spacer()
 
                 // Play mode toggle
                 playModeButton
 
-                // Playlist toggle
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        showPlaylist.toggle()
-                    }
-                }) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(showPlaylist ? themeManager.accent : .white.opacity(0.5))
-                        .frame(width: 34, height: 34)
-                        .background(
-                            showPlaylist
-                                ? themeManager.accent.opacity(0.08)
-                                : Color.white.opacity(0.04)
-                        )
-                        .cornerRadius(8)
-                }
-                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
+                Spacer()
 
                 // Background mode picker
                 Button(action: { showBgPicker.toggle() }) {
@@ -302,6 +291,8 @@ struct MainPlayerView: View {
                     .frame(width: 160)
                 }
 
+                Spacer()
+
                 // Theme toggle
                 Button(action: { themeManager.cycle() }) {
                     Circle()
@@ -315,6 +306,8 @@ struct MainPlayerView: View {
                 }
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
                 .help("Theme: \(themeManager.themeName)")
+
+                Spacer()
 
                 // Volume control (Apple Music style)
                 HStack(spacing: 6) {
@@ -341,6 +334,8 @@ struct MainPlayerView: View {
                     volume = player.volume
                 }
 
+                Spacer()
+
                 // Window opacity slider
                 HStack(spacing: 4) {
                     Image(systemName: "circle.lefthalf.filled")
@@ -357,6 +352,29 @@ struct MainPlayerView: View {
                     }
                 }
 
+                Spacer()
+
+                // Playlist toggle
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showPlaylist.toggle()
+                    }
+                }) {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(showPlaylist ? themeManager.accent : .white.opacity(0.5))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            showPlaylist
+                                ? themeManager.accent.opacity(0.08)
+                                : Color.white.opacity(0.04)
+                        )
+                        .cornerRadius(8)
+                }
+                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
+
+                Spacer()
+
                 // Mini player toggle
                 Button(action: switchToMiniPlayer) {
                     Image(systemName: "arrow.down.forward.and.arrow.up.backward")
@@ -369,19 +387,16 @@ struct MainPlayerView: View {
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
                 .help("Switch to mini player")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .frame(height: 52)
-            .background(
-                // Glass effect for control bar
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.7)
-            )
             .padding(.horizontal, 20)
-            .padding(.bottom, 16)
         }
-        .frame(height: 52)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.ultraThinMaterial)
+                .opacity(0.7)
+        )
+        .padding(.horizontal, 20)
+        .padding(.bottom, 16)
     }
 
     /// Play mode button — cycles sequential → singleLoop → random → sequential
