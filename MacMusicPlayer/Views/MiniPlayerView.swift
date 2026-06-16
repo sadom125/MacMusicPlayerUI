@@ -212,11 +212,18 @@ struct MiniPlayerView: View {
         let targetY = screenFrame.midY - fullHeight / 2
         let targetFrame = NSRect(x: targetX, y: targetY, width: fullWidth, height: fullHeight)
 
+        // Restore saved window opacity
+        let savedOpacity = UserDefaults.standard.double(forKey: "windowOpacity")
+        let targetOpacity = savedOpacity > 0 ? CGFloat(savedOpacity) : 1.0
+
         // Start full window at mini player position/size, then animate to centered target
         mainWindow.setFrame(miniFrame, display: false)
         mainWindow.alphaValue = 0.0
         mainWindow.makeKeyAndOrderFront(nil)
         mainWindow.updateTitle()
+
+        // Force glass view redraw to avoid black flash
+        mainWindow.displayIfNeeded()
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.35
@@ -224,9 +231,11 @@ struct MiniPlayerView: View {
             ctx.allowsImplicitAnimation = true
 
             mainWindow.animator().setFrame(targetFrame, display: true)
-            mainWindow.animator().alphaValue = 1.0
+            mainWindow.animator().alphaValue = targetOpacity
         } completionHandler: {
             miniPanel.orderOut(nil)
+            // Force glass re-render after animation
+            mainWindow.displayIfNeeded()
         }
     }
 }
