@@ -204,9 +204,10 @@ struct MiniPlayerView: View {
         mainWindow.level = .normal
         mainWindow.collectionBehavior = [.canJoinAllSpaces]
 
-        // Calculate centered target frame
-        let fullWidth: CGFloat = 680
-        let fullHeight: CGFloat = 580
+        // Check if playlist was open and use expanded width
+        let playlistWasOpen = UserDefaults.standard.bool(forKey: "showPlaylist")
+        let fullWidth: CGFloat = playlistWasOpen ? 1180 : 900
+        let fullHeight: CGFloat = 650
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let targetX = screenFrame.midX - fullWidth / 2
         let targetY = screenFrame.midY - fullHeight / 2

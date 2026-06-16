@@ -8,12 +8,12 @@ import SwiftUI
 struct MainPlayerView: View {
     @ObservedObject var player: PlayerManager
     @ObservedObject var themeManager = ThemeManager.shared
-    @State private var showPlaylist: Bool = false
     @State private var lyrics: [LyricLine] = []
     @State private var currentLyricIndex: Int = 0
     @State private var artworkFallbackCache: [UUID: Data?] = [:]
     @AppStorage("bgMode") private var bgMode: String = "albumArt"
     @AppStorage("windowOpacity") private var windowOpacity: Double = 1.0
+    @AppStorage("showPlaylist") private var showPlaylist: Bool = false
     @State private var showBgPicker: Bool = false
     @State private var volume: Float = 0.3
 
@@ -127,10 +127,9 @@ struct MainPlayerView: View {
         mouseMonitor = monitor
 
         // Periodic timer to check idle timeout
-        // Don't auto-hide when playlist is open (user might be scrolling)
         idleTimer = Timer.scheduledTimer(withTimeInterval: idleCheckInterval, repeats: true) { _ in
             let idle = Date().timeIntervalSince(self.lastMouseActivity)
-            let shouldHide = self.player.isPlaying && !self.showPlaylist && idle > self.idleThreshold
+            let shouldHide = self.player.isPlaying && idle > self.idleThreshold
             DispatchQueue.main.async {
                 if self.controlsVisible && shouldHide {
                     self.controlsVisible = false
