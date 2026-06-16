@@ -43,17 +43,13 @@ struct PlaylistPanel: View {
                 .padding(.vertical, 6)
             }
         }
-        .frame(width: 280)
+        .frame(width: 260)
         .frame(maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
-                .opacity(0.85)
+            RoundedRectangle(cornerRadius: 0)
+                .fill(Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0.95))
         )
-        .offset(x: 12)
-        .padding(.trailing, 12)
-        .padding(.bottom, 100)
-        .padding(.top, 30) // Below title bar
+        .padding(.top, 28) // Below title bar
     }
 }
 

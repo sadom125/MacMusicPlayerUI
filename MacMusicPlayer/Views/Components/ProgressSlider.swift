@@ -30,23 +30,24 @@ struct ProgressSlider: View {
                 .frame(minWidth: 32, alignment: .leading)
 
             GeometryReader { geo in
+                let trackWidth = geo.size.width
                 let thumbSize: CGFloat = 14
                 let trackHeight: CGFloat = 6
-                let thumbOffset = thumbSize / 2
+                let centerY = geo.size.height / 2
 
-                ZStack(alignment: .leading) {
+                ZStack {
                     // Track background
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.white.opacity(0.05))
-                        .frame(height: trackHeight)
-                        .offset(y: (geo.size.height - trackHeight) / 2)
+                        .frame(width: trackWidth, height: trackHeight)
+                        .position(x: trackWidth / 2, y: centerY)
 
-                    // Glow behind fill bar — breathing blue
+                    // Glow behind fill bar
                     RoundedRectangle(cornerRadius: 3)
                         .fill(ThemeManager.shared.accent.opacity(breathe ? 0.3 : 0.1))
-                        .frame(width: max(0, geo.size.width * CGFloat(progress) - thumbOffset), height: trackHeight)
+                        .frame(width: max(0, trackWidth * CGFloat(progress) - thumbSize / 2), height: trackHeight)
                         .blur(radius: 6)
-                        .offset(y: (geo.size.height - trackHeight) / 2)
+                        .position(x: max(thumbSize / 2, trackWidth * CGFloat(progress) / 2), y: centerY)
 
                     // Fill bar
                     RoundedRectangle(cornerRadius: 3)
@@ -60,8 +61,8 @@ struct ProgressSlider: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(0, geo.size.width * CGFloat(progress) - thumbOffset), height: trackHeight)
-                        .offset(y: (geo.size.height - trackHeight) / 2)
+                        .frame(width: max(0, trackWidth * CGFloat(progress) - thumbSize / 2), height: trackHeight)
+                        .position(x: max(thumbSize / 2, trackWidth * CGFloat(progress) / 2), y: centerY)
 
                     // Thumb — glass effect with breathing glow
                     Circle()
@@ -73,19 +74,19 @@ struct ProgressSlider: View {
                                 .frame(width: 8, height: 8)
                         )
                         .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.5 : 0.2), radius: breathe ? 4 : 2)
-                        .offset(x: max(0, geo.size.width * CGFloat(progress) - thumbOffset), y: (geo.size.height - thumbSize) / 2)
+                        .position(x: max(thumbSize / 2, trackWidth * CGFloat(progress)), y: centerY)
                         .scaleEffect(isDragging ? 1.2 : 1.0)
                 }
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            let ratio = max(0, min(1, value.location.x / max(geo.size.width, 1)))
+                            let ratio = max(0, min(1, value.location.x / max(trackWidth, 1)))
                             let newTime = ratio * effectiveDuration
                             isDragging = true
                             dragTime = newTime
                         }
                         .onEnded { value in
-                            let ratio = max(0, min(1, value.location.x / max(geo.size.width, 1)))
+                            let ratio = max(0, min(1, value.location.x / max(trackWidth, 1)))
                             let newTime = ratio * effectiveDuration
                             isDragging = false
                             if effectiveDuration > 0 {
@@ -96,7 +97,7 @@ struct ProgressSlider: View {
                 )
                 .contentShape(Rectangle())
             }
-            .frame(height: 28) // larger touch area
+            .frame(height: 28)
 
             Text(formatTime(effectiveDuration))
                 .font(.system(size: 11, design: .monospaced))

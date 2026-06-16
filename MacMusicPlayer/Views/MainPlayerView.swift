@@ -58,21 +58,24 @@ struct MainPlayerView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // === Main Content: Lyrics fill entire area ===
-            LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        HStack(spacing: 0) {
+            // === Main Content: Lyrics + Controls ===
+            ZStack(alignment: .bottom) {
+                // Lyrics fill entire area
+                LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // === Floating Bottom Controls (overlay) ===
-            controlBar
-                .padding(.horizontal, 32)
-                .padding(.bottom, 8)
-                .offset(y: controlsVisible ? 0 : 80)
-                .opacity(controlsVisible ? 1 : 0)
-                .animation(.easeOut(duration: 0.5), value: controlsVisible)
-        }
-        .overlay(alignment: .trailing) {
-            // Playlist side panel (extends outside window)
+                // Floating Bottom Controls (overlay)
+                controlBar
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 8)
+                    .offset(y: controlsVisible ? 0 : 80)
+                    .opacity(controlsVisible ? 1 : 0)
+                    .animation(.easeOut(duration: 0.5), value: controlsVisible)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // === Playlist Panel (right side) ===
             if showPlaylist {
                 PlaylistPanel(
                     tracks: player.playlist,
@@ -82,9 +85,9 @@ struct MainPlayerView: View {
                     }
                 )
                 .transition(.move(edge: .trailing).combined(with: .opacity))
-                .animation(.easeInOut(duration: 0.3), value: showPlaylist)
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: showPlaylist)
         .background(
             AlbumArtBackground(
                 artworkData: bgMode == "none" ? nil : currentArtworkData,
@@ -217,8 +220,7 @@ struct MainPlayerView: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.6)
+                    .fill(Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0.8))
             )
 
             // Bottom row: Controls (evenly distributed)
@@ -361,6 +363,13 @@ struct MainPlayerView: View {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         showPlaylist.toggle()
                     }
+                    // Resize window to show/hide playlist
+                    if let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) {
+                        let targetWidth: CGFloat = showPlaylist ? 1180 : 900
+                        var frame = window.frame
+                        frame.size.width = targetWidth
+                        window.setFrame(frame, display: true, animate: true)
+                    }
                 }) {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 13, weight: .medium))
@@ -394,8 +403,7 @@ struct MainPlayerView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
-                .opacity(0.85)
+                .fill(Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0.9))
         )
         .padding(.horizontal, 20)
         .padding(.bottom, 16)
