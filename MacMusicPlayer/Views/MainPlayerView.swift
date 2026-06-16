@@ -57,14 +57,6 @@ struct MainPlayerView: View {
         return Color(hex: hex)
     }
 
-    /// Panel background color based on bgMode
-    private var panelBgColor: Color {
-        if let solid = solidBgColor {
-            return solid
-        }
-        return Color(red: 0.031, green: 0.031, blue: 0.055)
-    }
-
     var body: some View {
         HStack(spacing: 0) {
             // === Main Content: Lyrics + Controls ===
@@ -88,7 +80,6 @@ struct MainPlayerView: View {
                 PlaylistPanel(
                     tracks: player.playlist,
                     currentTrackID: player.currentTrack?.id,
-                    backgroundColor: panelBgColor,
                     onTrackTap: { index in
                         player.playTrack(at: index)
                     }
@@ -229,7 +220,8 @@ struct MainPlayerView: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(panelBgColor.opacity(0.8))
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.4)
             )
 
             // Bottom row: Controls (evenly distributed)
@@ -412,7 +404,8 @@ struct MainPlayerView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(panelBgColor.opacity(0.9))
+                .fill(.ultraThinMaterial)
+                .opacity(0.5)
         )
         .padding(.horizontal, 20)
         .padding(.bottom, 16)

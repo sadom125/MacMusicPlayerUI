@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Side panel playlist displayed on the right side of the player.
 /// Shows the current queue with active track highlighted.
+/// No background - uses the main window's background.
 struct PlaylistPanel: View {
     let tracks: [Track]
     let currentTrackID: UUID?
-    var backgroundColor: Color = Color(red: 0.031, green: 0.031, blue: 0.055)
     var onTrackTap: ((Int) -> Void)?
 
     var body: some View {
@@ -46,9 +46,6 @@ struct PlaylistPanel: View {
         }
         .frame(width: 260)
         .frame(maxHeight: .infinity)
-        .background(
-            backgroundColor.opacity(0.95)
-        )
     }
 }
 
