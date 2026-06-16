@@ -85,6 +85,7 @@ struct MainPlayerView: View {
                     }
                 )
                 .transition(.move(edge: .trailing).combined(with: .opacity))
+                .ignoresSafeArea(.container, edges: .top)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: showPlaylist)
@@ -159,6 +160,9 @@ struct MainPlayerView: View {
     /// Switch to mini player with smooth animation
     private func switchToMiniPlayer() {
         guard let fullWindow = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else { return }
+
+        // Save zoomed state before switching
+        UserDefaults.standard.set(fullWindow.isZoomed, forKey: "wasZoomedBeforeMini")
 
         // If window is maximized (zoomed), restore to normal size first
         if fullWindow.isZoomed {
@@ -363,8 +367,8 @@ struct MainPlayerView: View {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         showPlaylist.toggle()
                     }
-                    // Resize window to show/hide playlist
-                    if let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) {
+                    // Resize window to show/hide playlist (skip if maximized)
+                    if let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }), !window.isZoomed {
                         let targetWidth: CGFloat = showPlaylist ? 1180 : 900
                         var frame = window.frame
                         frame.size.width = targetWidth

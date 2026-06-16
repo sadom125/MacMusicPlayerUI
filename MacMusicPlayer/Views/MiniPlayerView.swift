@@ -206,6 +206,7 @@ struct MiniPlayerView: View {
 
         // Check if playlist was open and use expanded width
         let playlistWasOpen = UserDefaults.standard.bool(forKey: "showPlaylist")
+        let wasZoomed = UserDefaults.standard.bool(forKey: "wasZoomedBeforeMini")
         let fullWidth: CGFloat = playlistWasOpen ? 1180 : 900
         let fullHeight: CGFloat = 650
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -235,6 +236,10 @@ struct MiniPlayerView: View {
             mainWindow.animator().alphaValue = targetOpacity
         } completionHandler: {
             miniPanel.orderOut(nil)
+            // Restore zoom state if it was zoomed before
+            if wasZoomed && !mainWindow.isZoomed {
+                mainWindow.zoom(nil)
+            }
             // Force glass re-render after animation
             mainWindow.displayIfNeeded()
         }
