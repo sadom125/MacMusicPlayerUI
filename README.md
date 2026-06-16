@@ -48,7 +48,7 @@
 ## 构建
 
 ```bash
-git clone https://github.com/你的用户名/MacMusicPlayer.git
+git clone https://github.com/sadom125/MacMusicPlayerUI
 cd MacMusicPlayer
 
 xcodebuild -project MacMusicPlayer.xcodeproj \
