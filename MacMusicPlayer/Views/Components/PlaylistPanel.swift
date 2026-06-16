@@ -1,32 +1,56 @@
 import SwiftUI
 
-/// Expandable playlist panel shown below the control bar.
-/// Displays the current queue with active track highlighted.
+/// Side panel playlist displayed on the right side of the player.
+/// Shows the current queue with active track highlighted.
 struct PlaylistPanel: View {
     let tracks: [Track]
     let currentTrackID: UUID?
     var onTrackTap: ((Int) -> Void)?
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 0) {
-                ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                    Button(action: { onTrackTap?(index) }) {
-                        PlaylistRow(
-                            index: index + 1,
-                            title: track.title,
-                            artist: track.artist,
-                            duration: track.duration,
-                            isActive: track.id == currentTrackID
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("播放列表")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.8))
+                Spacer()
+                Text("\(tracks.count) 首")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.4))
             }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            Divider().background(Color.white.opacity(0.1))
+
+            // Track list
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                        Button(action: { onTrackTap?(index) }) {
+                            PlaylistRow(
+                                index: index + 1,
+                                title: track.title,
+                                artist: track.artist,
+                                duration: track.duration,
+                                isActive: track.id == currentTrackID
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
         }
-        .frame(maxHeight: 260)
+        .frame(width: 280)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .opacity(0.85)
+        )
+        .padding(.trailing, 12)
+        .padding(.bottom, 80) // Above control bar
     }
 }
 
@@ -40,35 +64,44 @@ private struct PlaylistRow: View {
     @ObservedObject var themeManager = ThemeManager.shared
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
+            // Track number
             Text(String(format: "%02d", index))
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.35))
-                .frame(width: 24, alignment: .trailing)
+                .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.3))
+                .frame(width: 20, alignment: .trailing)
 
-            VStack(alignment: .leading, spacing: 1) {
+            // Track info
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13))
-                    .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.7))
+                    .font(.system(size: 13, weight: isActive ? .medium : .regular))
+                    .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.75))
                     .lineLimit(1)
+                    .truncationMode(.tail)
+
                 if !artist.isEmpty {
                     Text(artist)
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.35))
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
+            // Duration
             Text(formatDuration(duration))
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.35))
+                .foregroundColor(.white.opacity(0.3))
         }
-        .padding(.vertical, 5)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isActive ? themeManager.accent.opacity(0.08) : Color.clear)
+        )
         .padding(.horizontal, 8)
-        .background(isActive ? themeManager.accent.opacity(0.05) : Color.clear)
-        .cornerRadius(6)
     }
 
     private func formatDuration(_ time: TimeInterval) -> String {

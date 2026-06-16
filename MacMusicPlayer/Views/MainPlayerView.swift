@@ -58,18 +58,13 @@ struct MainPlayerView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // === Background: Lyrics fill entire area ===
-            LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // === Main Content: Lyrics + Right Playlist ===
+            HStack(spacing: 0) {
+                // Lyrics fill remaining space
+                LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // === Floating Bottom Controls (overlay, no layout space) ===
-            VStack(spacing: 0) {
-                // Control bar
-                controlBar
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 8)
-
-                // Playlist panel
+                // Playlist side panel (slides in from right)
                 if showPlaylist {
                     PlaylistPanel(
                         tracks: player.playlist,
@@ -78,12 +73,18 @@ struct MainPlayerView: View {
                             player.playTrack(at: index)
                         }
                     )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
-            .offset(y: controlsVisible ? 0 : 110)
-            .opacity(controlsVisible ? 1 : 0)
-            .animation(.easeOut(duration: 0.5), value: controlsVisible)
+            .animation(.easeInOut(duration: 0.3), value: showPlaylist)
+
+            // === Floating Bottom Controls (overlay) ===
+            controlBar
+                .padding(.horizontal, 32)
+                .padding(.bottom, 8)
+                .offset(y: controlsVisible ? 0 : 80)
+                .opacity(controlsVisible ? 1 : 0)
+                .animation(.easeOut(duration: 0.5), value: controlsVisible)
         }
         .background(
             AlbumArtBackground(
