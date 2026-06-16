@@ -49,8 +49,9 @@ struct PlaylistPanel: View {
                 .fill(.ultraThinMaterial)
                 .opacity(0.85)
         )
+        .offset(x: 12) // Extend outside window
         .padding(.trailing, 12)
-        .padding(.bottom, 130) // Above control bar (2-row layout height)
+        .padding(.bottom, 130)
     }
 }
 

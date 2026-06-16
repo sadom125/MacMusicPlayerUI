@@ -128,8 +128,8 @@ struct MainPlayerView: View {
         idleTimer = Timer.scheduledTimer(withTimeInterval: idleCheckInterval, repeats: true) { _ in
             let idle = Date().timeIntervalSince(self.lastMouseActivity)
             let shouldHide = self.player.isPlaying && !self.showPlaylist && idle > self.idleThreshold
-            if self.controlsVisible == shouldHide {
-                self.controlsVisible = !shouldHide
+            if self.controlsVisible != shouldHide {
+                self.controlsVisible = shouldHide ? false : true
             }
         }
     }

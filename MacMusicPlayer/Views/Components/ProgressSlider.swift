@@ -35,12 +35,14 @@ struct ProgressSlider: View {
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.white.opacity(0.05))
                         .frame(height: 6)
+                        .offset(y: 11) // Center vertically in 28px frame
 
                     // Glow behind fill bar — breathing blue
                     RoundedRectangle(cornerRadius: 3)
                         .fill(ThemeManager.shared.accent.opacity(breathe ? 0.3 : 0.1))
-                        .frame(width: max(0, geo.size.width * CGFloat(progress)), height: 6)
+                        .frame(width: max(0, geo.size.width * CGFloat(progress) - 7), height: 6)
                         .blur(radius: 6)
+                        .offset(y: 11)
 
                     // Fill bar
                     RoundedRectangle(cornerRadius: 3)
@@ -54,7 +56,8 @@ struct ProgressSlider: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(0, geo.size.width * CGFloat(progress)), height: 6)
+                        .frame(width: max(0, geo.size.width * CGFloat(progress) - 7), height: 6)
+                        .offset(y: 11)
 
                     // Thumb — glass effect with breathing glow
                     Circle()
@@ -66,7 +69,7 @@ struct ProgressSlider: View {
                                 .frame(width: 8, height: 8)
                         )
                         .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.5 : 0.2), radius: breathe ? 4 : 2)
-                        .position(x: max(7, geo.size.width * CGFloat(progress)), y: geo.size.height / 2)
+                        .offset(x: max(0, geo.size.width * CGFloat(progress) - 7), y: 7)
                         .scaleEffect(isDragging ? 1.2 : 1.0)
                 }
                 .gesture(
