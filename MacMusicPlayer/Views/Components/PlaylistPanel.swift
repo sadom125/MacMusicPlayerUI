@@ -5,6 +5,7 @@ import SwiftUI
 struct PlaylistPanel: View {
     let tracks: [Track]
     let currentTrackID: UUID?
+    var backgroundColor: Color = Color(red: 0.031, green: 0.031, blue: 0.055)
     var onTrackTap: ((Int) -> Void)?
 
     var body: some View {
@@ -46,10 +47,8 @@ struct PlaylistPanel: View {
         .frame(width: 260)
         .frame(maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 0)
-                .fill(Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0.95))
+            backgroundColor.opacity(0.95)
         )
-        .padding(.top, 28) // Below title bar
     }
 }
 
