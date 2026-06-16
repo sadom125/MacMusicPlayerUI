@@ -57,21 +57,17 @@ struct MainPlayerView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            // === Lyrics Section ===
+        ZStack(alignment: .bottom) {
+            // === Background: Lyrics fill entire area ===
             LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
-                .frame(maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            Spacer()
-
-            // === Auto-hiding Bottom Controls ===
+            // === Floating Bottom Controls (overlay, no layout space) ===
             VStack(spacing: 0) {
                 // Control bar
                 controlBar
-                .padding(.horizontal, 32)
-                .padding(.bottom, 8)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 8)
 
                 // Playlist panel
                 if showPlaylist {
