@@ -15,6 +15,7 @@ struct MainPlayerView: View {
     @AppStorage("bgMode") private var bgMode: String = "albumArt"
     @AppStorage("windowOpacity") private var windowOpacity: Double = 1.0
     @State private var showBgPicker: Bool = false
+    @State private var volume: Float = 0.3
 
     /// Background mode options
     private let bgOptions: [(id: String, label: String, color: Color?)] = [
@@ -315,13 +316,38 @@ struct MainPlayerView: View {
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
                 .help("Theme: \(themeManager.themeName)")
 
+                // Volume control (Apple Music style)
+                HStack(spacing: 6) {
+                    Button(action: {
+                        volume = volume > 0 ? 0 : 0.3
+                        player.volume = volume
+                    }) {
+                        Image(systemName: volumeIcon)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.5))
+                            .frame(width: 20)
+                    }
+                    .buttonStyle(.plain)
+
+                    Slider(value: Binding(
+                        get: { Double(volume) },
+                        set: { volume = Float($0); player.volume = volume }
+                    ), in: 0...1)
+                        .frame(width: 70)
+                        .tint(themeManager.accent)
+                }
+                .frame(height: 34)
+                .onAppear {
+                    volume = player.volume
+                }
+
                 // Window opacity slider
                 HStack(spacing: 4) {
                     Image(systemName: "circle.lefthalf.filled")
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.4))
                     Slider(value: $windowOpacity, in: 0.3...1.0)
-                        .frame(width: 60)
+                        .frame(width: 50)
                         .tint(themeManager.accent)
                 }
                 .frame(height: 34)
@@ -419,6 +445,19 @@ struct MainPlayerView: View {
                 .frame(width: 36, height: 36)
         }
         .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
+    }
+
+    /// Volume icon based on level (Apple Music style)
+    private var volumeIcon: String {
+        if volume <= 0 {
+            return "speaker.slash.fill"
+        } else if volume < 0.33 {
+            return "speaker.wave.1.fill"
+        } else if volume < 0.66 {
+            return "speaker.wave.2.fill"
+        } else {
+            return "speaker.wave.3.fill"
+        }
     }
 
     // MARK: - Lyrics
