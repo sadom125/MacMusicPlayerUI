@@ -66,7 +66,7 @@ struct ProgressSlider: View {
                                 .frame(width: 8, height: 8)
                         )
                         .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.5 : 0.2), radius: breathe ? 4 : 2)
-                        .offset(x: max(0, geo.size.width * CGFloat(progress) - 7))
+                        .position(x: max(7, geo.size.width * CGFloat(progress)), y: geo.size.height / 2)
                         .scaleEffect(isDragging ? 1.2 : 1.0)
                 }
                 .gesture(

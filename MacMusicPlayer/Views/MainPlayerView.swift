@@ -59,25 +59,9 @@ struct MainPlayerView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // === Main Content: Lyrics + Right Playlist ===
-            HStack(spacing: 0) {
-                // Lyrics fill remaining space
-                LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                // Playlist side panel (slides in from right)
-                if showPlaylist {
-                    PlaylistPanel(
-                        tracks: player.playlist,
-                        currentTrackID: player.currentTrack?.id,
-                        onTrackTap: { index in
-                            player.playTrack(at: index)
-                        }
-                    )
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: showPlaylist)
+            // === Main Content: Lyrics fill entire area ===
+            LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // === Floating Bottom Controls (overlay) ===
             controlBar
@@ -86,6 +70,20 @@ struct MainPlayerView: View {
                 .offset(y: controlsVisible ? 0 : 80)
                 .opacity(controlsVisible ? 1 : 0)
                 .animation(.easeOut(duration: 0.5), value: controlsVisible)
+        }
+        .overlay(alignment: .trailing) {
+            // Playlist side panel (extends outside window)
+            if showPlaylist {
+                PlaylistPanel(
+                    tracks: player.playlist,
+                    currentTrackID: player.currentTrack?.id,
+                    onTrackTap: { index in
+                        player.playTrack(at: index)
+                    }
+                )
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.3), value: showPlaylist)
+            }
         }
         .background(
             AlbumArtBackground(

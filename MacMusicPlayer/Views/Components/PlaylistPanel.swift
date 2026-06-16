@@ -50,7 +50,7 @@ struct PlaylistPanel: View {
                 .opacity(0.85)
         )
         .padding(.trailing, 12)
-        .padding(.bottom, 140) // Above control bar (increased for 2-row layout)
+        .padding(.bottom, 130) // Above control bar (2-row layout height)
     }
 }
 
