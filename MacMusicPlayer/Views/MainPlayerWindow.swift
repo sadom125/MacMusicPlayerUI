@@ -16,10 +16,12 @@ class MainPlayerWindow: NSWindow {
         let hosting = NSHostingView(rootView: AnyView(contentView))
         self.hostingView = hosting
 
-        // Check if playlist was open and use expanded width
+        // Check if playlist was open and use expanded size based on position
         let playlistWasOpen = UserDefaults.standard.bool(forKey: "showPlaylist")
-        let initialWidth: CGFloat = playlistWasOpen ? 1180 : 900
-        let windowRect = NSRect(x: 0, y: 0, width: initialWidth, height: 650)
+        let playlistPosition = UserDefaults.standard.string(forKey: "playlistPosition") ?? "right"
+        let initialWidth: CGFloat = playlistWasOpen && playlistPosition == "right" ? 1180 : 900
+        let initialHeight: CGFloat = playlistWasOpen && playlistPosition == "bottom" ? 900 : 650
+        let windowRect = NSRect(x: 0, y: 0, width: initialWidth, height: initialHeight)
         super.init(
             contentRect: windowRect,
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],

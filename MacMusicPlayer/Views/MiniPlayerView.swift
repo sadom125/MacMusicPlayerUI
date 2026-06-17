@@ -204,11 +204,12 @@ struct MiniPlayerView: View {
         mainWindow.level = .normal
         mainWindow.collectionBehavior = [.canJoinAllSpaces]
 
-        // Check if playlist was open and use expanded width
+        // Check if playlist was open and use expanded size based on position
         let playlistWasOpen = UserDefaults.standard.bool(forKey: "showPlaylist")
+        let playlistPosition = UserDefaults.standard.string(forKey: "playlistPosition") ?? "right"
         let wasZoomed = UserDefaults.standard.bool(forKey: "wasZoomedBeforeMini")
-        let fullWidth: CGFloat = playlistWasOpen ? 1180 : 900
-        let fullHeight: CGFloat = 650
+        let fullWidth: CGFloat = playlistWasOpen && playlistPosition == "right" ? 1180 : 900
+        let fullHeight: CGFloat = playlistWasOpen && playlistPosition == "bottom" ? 900 : 650
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let targetX = screenFrame.midX - fullWidth / 2
         let targetY = screenFrame.midY - fullHeight / 2

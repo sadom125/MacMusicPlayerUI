@@ -14,7 +14,9 @@ struct MainPlayerView: View {
     @AppStorage("bgMode") private var bgMode: String = "albumArt"
     @AppStorage("windowOpacity") private var windowOpacity: Double = 1.0
     @AppStorage("showPlaylist") private var showPlaylist: Bool = false
+    @AppStorage("playlistPosition") private var playlistPosition: String = "right" // "right" or "bottom"
     @State private var showBgPicker: Bool = false
+    @State private var showPlaylistMenu: Bool = false
     @State private var volume: Float = 0.3
 
     /// Background mode options
@@ -58,37 +60,76 @@ struct MainPlayerView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // === Main Content: Lyrics + Controls ===
-            ZStack(alignment: .bottom) {
-                // Lyrics fill entire area
-                LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+        Group {
+            if playlistPosition == "right" {
+                // Right side playlist layout
+                HStack(spacing: 0) {
+                    // === Main Content: Lyrics + Controls ===
+                    ZStack(alignment: .bottom) {
+                        // Lyrics fill entire area
+                        LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                        // Floating Bottom Controls (overlay)
+                        controlBar
+                            .padding(.horizontal, 32)
+                            .padding(.bottom, 8)
+                            .offset(y: controlsVisible ? 0 : 80)
+                            .opacity(controlsVisible ? 1 : 0)
+                            .animation(.easeOut(duration: 0.5), value: controlsVisible)
+                    }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // Floating Bottom Controls (overlay)
-                controlBar
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 8)
-                    .offset(y: controlsVisible ? 0 : 80)
-                    .opacity(controlsVisible ? 1 : 0)
-                    .animation(.easeOut(duration: 0.5), value: controlsVisible)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // === Playlist Panel (right side) ===
-            if showPlaylist {
-                PlaylistPanel(
-                    tracks: player.playlist,
-                    currentTrackID: player.currentTrack?.id,
-                    onTrackTap: { index in
-                        player.playTrack(at: index)
+                    // === Playlist Panel (right side) ===
+                    if showPlaylist {
+                        PlaylistPanel(
+                            tracks: player.playlist,
+                            currentTrackID: player.currentTrack?.id,
+                            onTrackTap: { index in
+                                player.playTrack(at: index)
+                            }
+                        )
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        .ignoresSafeArea(.container, edges: .top)
                     }
-                )
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-                .ignoresSafeArea(.container, edges: .top)
+                }
+                .animation(.easeInOut(duration: 0.25), value: showPlaylist)
+            } else {
+                // Bottom playlist layout
+                VStack(spacing: 0) {
+                    // === Main Content: Lyrics + Controls ===
+                    ZStack(alignment: .bottom) {
+                        // Lyrics fill entire area
+                        LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                        // Floating Bottom Controls (overlay)
+                        controlBar
+                            .padding(.horizontal, 32)
+                            .padding(.bottom, 8)
+                            .offset(y: controlsVisible ? 0 : 80)
+                            .opacity(controlsVisible ? 1 : 0)
+                            .animation(.easeOut(duration: 0.5), value: controlsVisible)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    // === Playlist Panel (bottom) ===
+                    if showPlaylist {
+                        PlaylistPanel(
+                            tracks: player.playlist,
+                            currentTrackID: player.currentTrack?.id,
+                            onTrackTap: { index in
+                                player.playTrack(at: index)
+                            },
+                            isHorizontal: true
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .ignoresSafeArea(.container, edges: .bottom)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.25), value: showPlaylist)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: showPlaylist)
         .background(
             AlbumArtBackground(
                 artworkData: bgMode == "none" ? nil : currentArtworkData,
@@ -362,18 +403,9 @@ struct MainPlayerView: View {
 
                 Spacer()
 
-                // Playlist toggle
+                // Playlist toggle with dropdown
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        showPlaylist.toggle()
-                    }
-                    // Resize window to show/hide playlist (skip if maximized)
-                    if let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }), !window.isZoomed {
-                        let targetWidth: CGFloat = showPlaylist ? 1180 : 900
-                        var frame = window.frame
-                        frame.size.width = targetWidth
-                        window.setFrame(frame, display: true, animate: true)
-                    }
+                    showPlaylistMenu = true
                 }) {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 13, weight: .medium))
@@ -387,6 +419,102 @@ struct MainPlayerView: View {
                         .cornerRadius(8)
                 }
                 .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
+                .popover(isPresented: $showPlaylistMenu, arrowEdge: .top) {
+                    VStack(spacing: 4) {
+                        // Toggle playlist visibility
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showPlaylist.toggle()
+                            }
+                            if let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }), !window.isZoomed {
+                                let targetWidth: CGFloat = playlistPosition == "right" ? (showPlaylist ? 1180 : 900) : 900
+                                let targetHeight: CGFloat = playlistPosition == "bottom" ? (showPlaylist ? 900 : 650) : 650
+                                var frame = window.frame
+                                frame.size.width = targetWidth
+                                frame.size.height = targetHeight
+                                window.setFrame(frame, display: true, animate: true)
+                            }
+                            showPlaylistMenu = false
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: showPlaylist ? "eye.slash" : "eye")
+                                    .font(.system(size: 12))
+                                Text(showPlaylist ? "隐藏播放列表" : "显示播放列表")
+                                    .font(.system(size: 13))
+                                Spacer()
+                            }
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider()
+
+                        // Position: Right
+                        Button(action: {
+                            playlistPosition = "right"
+                            if showPlaylist, let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }), !window.isZoomed {
+                                var frame = window.frame
+                                frame.size.width = 1180
+                                frame.size.height = 650
+                                window.setFrame(frame, display: true, animate: true)
+                            }
+                            showPlaylistMenu = false
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "rectangle.split.3x1")
+                                    .font(.system(size: 12))
+                                Text("右侧显示")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                if playlistPosition == "right" {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(themeManager.accent)
+                                }
+                            }
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        // Position: Bottom
+                        Button(action: {
+                            playlistPosition = "bottom"
+                            if showPlaylist, let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }), !window.isZoomed {
+                                var frame = window.frame
+                                frame.size.width = 900
+                                frame.size.height = 900
+                                window.setFrame(frame, display: true, animate: true)
+                            }
+                            showPlaylistMenu = false
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "rectangle.split.1x2")
+                                    .font(.system(size: 12))
+                                Text("底部显示")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                if playlistPosition == "bottom" {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(themeManager.accent)
+                                }
+                            }
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.vertical, 8)
+                    .frame(width: 200)
+                }
 
                 Spacer()
 

@@ -1,51 +1,94 @@
 import SwiftUI
 
-/// Side panel playlist displayed on the right side of the player.
+/// Side panel playlist displayed on the right or bottom of the player.
 /// Shows the current queue with active track highlighted.
 /// No background - uses the main window's background.
 struct PlaylistPanel: View {
     let tracks: [Track]
     let currentTrackID: UUID?
     var onTrackTap: ((Int) -> Void)?
+    var isHorizontal: Bool = false // true for bottom layout
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("播放列表")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.8))
-                Spacer()
-                Text("\(tracks.count) 首")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-
-            Divider().background(Color.white.opacity(0.1))
-
-            // Track list
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                        Button(action: { onTrackTap?(index) }) {
-                            PlaylistRow(
-                                index: index + 1,
-                                title: track.title,
-                                artist: track.artist,
-                                duration: track.duration,
-                                isActive: track.id == currentTrackID
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+        if isHorizontal {
+            // Bottom layout: vertical scroll (v1 style)
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text("播放列表")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
+                    Spacer()
+                    Text("\(tracks.count) 首")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
                 }
-                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Track list - vertical scroll (v1 style)
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                            Button(action: { onTrackTap?(index) }) {
+                                PlaylistRowBottom(
+                                    index: index + 1,
+                                    title: track.title,
+                                    artist: track.artist,
+                                    duration: track.duration,
+                                    isActive: track.id == currentTrackID
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
             }
+            .frame(maxWidth: .infinity)
+            .frame(maxHeight: .infinity)
+        } else {
+            // Right layout: vertical scroll
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text("播放列表")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
+                    Spacer()
+                    Text("\(tracks.count) 首")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+
+                Divider().background(Color.white.opacity(0.1))
+
+                // Track list
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                            Button(action: { onTrackTap?(index) }) {
+                                PlaylistRow(
+                                    index: index + 1,
+                                    title: track.title,
+                                    artist: track.artist,
+                                    duration: track.duration,
+                                    isActive: track.id == currentTrackID
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+            }
+            .frame(width: 260)
+            .frame(maxHeight: .infinity)
         }
-        .frame(width: 260)
-        .frame(maxHeight: .infinity)
     }
 }
 
@@ -94,6 +137,120 @@ private struct PlaylistRow: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 8)
+                .fill(isActive ? themeManager.accent.opacity(0.08) : Color.clear)
+        )
+        .padding(.horizontal, 8)
+    }
+
+    private func formatDuration(_ time: TimeInterval) -> String {
+        guard time.isFinite, time > 0 else { return "--:--" }
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return "\(minutes):\(String(format: "%02d", seconds))"
+    }
+}
+
+private struct PlaylistRowHorizontal: View {
+    let index: Int
+    let title: String
+    let artist: String
+    let duration: TimeInterval
+    let isActive: Bool
+
+    @ObservedObject var themeManager = ThemeManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Track number
+            Text(String(format: "%02d", index))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.3))
+
+            // Track title
+            Text(title)
+                .font(.system(size: 12, weight: isActive ? .medium : .regular))
+                .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.75))
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .frame(width: 120, alignment: .leading)
+
+            // Artist
+            if !artist.isEmpty {
+                Text(artist)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.35))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(width: 120, alignment: .leading)
+            }
+
+            // Duration
+            Text(formatDuration(duration))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.white.opacity(0.3))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isActive ? themeManager.accent.opacity(0.08) : Color.white.opacity(0.02))
+        )
+        .frame(width: 140)
+    }
+
+    private func formatDuration(_ time: TimeInterval) -> String {
+        guard time.isFinite, time > 0 else { return "--:--" }
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return "\(minutes):\(String(format: "%02d", seconds))"
+    }
+}
+
+private struct PlaylistRowBottom: View {
+    let index: Int
+    let title: String
+    let artist: String
+    let duration: TimeInterval
+    let isActive: Bool
+
+    @ObservedObject var themeManager = ThemeManager.shared
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Track number
+            Text(String(format: "%02d", index))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.3))
+                .frame(width: 24, alignment: .trailing)
+
+            // Track info
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: isActive ? .medium : .regular))
+                    .foregroundColor(isActive ? themeManager.accent : .white.opacity(0.75))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                if !artist.isEmpty {
+                    Text(artist)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.35))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            // Duration
+            Text(formatDuration(duration))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.white.opacity(0.3))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
                 .fill(isActive ? themeManager.accent.opacity(0.08) : Color.clear)
         )
         .padding(.horizontal, 8)
