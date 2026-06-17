@@ -18,6 +18,7 @@ struct MetadataParser {
     /// - Parameter url: File URL to an audio file (mp3, m4a, flac, wav, etc.)
     /// - Returns: Parsed metadata, or nil if the file can't be read.
     static func parse(from url: URL) async -> Metadata? {
+        let ext = url.pathExtension.lowercased()
         let asset = AVAsset(url: url)
 
         // Load metadata and duration concurrently
@@ -27,6 +28,10 @@ struct MetadataParser {
             metadata = try await asset.load(.metadata)
             duration = try await asset.load(.duration)
         } catch {
+            // For DFF/DSF files, AVAsset can't read DSD — fall back to ffmpeg
+            if ext == "dff" || ext == "dsf" {
+                return parseDSDViaFFmpeg(url: url)
+            }
             print("MetadataParser: failed to load asset metadata: \(error.localizedDescription)")
             return nil
         }
@@ -42,7 +47,7 @@ struct MetadataParser {
         let album = findMetadataItem(metadata: metadata, key: AVMetadataKey.commonKeyAlbumName)
             ?? NSLocalizedString("Unknown Album", comment: "Default album name")
         let artworkData = findArtwork(metadata: metadata) ?? extractArtworkViaFFmpeg(url: url)
-        let lyrics = findLyrics(metadata: metadata)
+        let lyrics = findLyrics(metadata: metadata) ?? extractLyricsViaFFmpeg(url: url)
 
         return Metadata(
             title: title,
@@ -169,6 +174,109 @@ struct MetadataParser {
         let data = try? Data(contentsOf: URL(fileURLWithPath: tempPath))
         try? FileManager.default.removeItem(atPath: tempPath)
         return data
+    }
+
+    /// Fallback: parse all metadata from DFF/DSF via ffmpeg when AVAsset fails.
+    private static func parseDSDViaFFmpeg(url: URL) -> Metadata? {
+        let filename = url.deletingPathExtension().lastPathComponent
+        var title = filename
+        var artist = NSLocalizedString("Unknown Artist", comment: "")
+        var album = NSLocalizedString("Unknown Album", comment: "")
+        var lyrics: String?
+
+        // Get ffmetadata for title/artist/album/lyrics
+        let metaProcess = Process()
+        metaProcess.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg")
+        metaProcess.arguments = ["-i", url.path, "-f", "ffmetadata", "-"]
+        let metaPipe = Pipe()
+        metaProcess.standardOutput = metaPipe
+        metaProcess.standardError = FileHandle.nullDevice
+        do {
+            try metaProcess.run()
+            metaProcess.waitUntilExit()
+        } catch {
+            return nil
+        }
+        if metaProcess.terminationStatus == 0,
+           let output = String(data: metaPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) {
+            for line in output.components(separatedBy: .newlines) {
+                if line.hasPrefix("title=") {
+                    let v = String(line.dropFirst("title=".count))
+                    if !v.isEmpty { title = v }
+                } else if line.hasPrefix("artist=") {
+                    let v = String(line.dropFirst("artist=".count))
+                    if !v.isEmpty { artist = v }
+                } else if line.hasPrefix("album=") {
+                    let v = String(line.dropFirst("album=".count))
+                    if !v.isEmpty { album = v }
+                } else if line.hasPrefix("LYRICS=") {
+                    let v = String(line.dropFirst("LYRICS=".count))
+                    if !v.isEmpty { lyrics = v }
+                }
+            }
+        }
+
+        // Get duration via ffprobe
+        var duration: TimeInterval = 0
+        let durProcess = Process()
+        durProcess.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffprobe")
+        durProcess.arguments = ["-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", url.path]
+        let durPipe = Pipe()
+        durProcess.standardOutput = durPipe
+        durProcess.standardError = FileHandle.nullDevice
+        do {
+            try durProcess.run()
+            durProcess.waitUntilExit()
+        } catch {}
+        if durProcess.terminationStatus == 0,
+           let durStr = String(data: durPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           let dur = Double(durStr), dur.isFinite {
+            duration = dur
+        }
+
+        // Extract artwork via ffmpeg
+        let artworkData = extractArtworkViaFFmpeg(url: url)
+
+        return Metadata(
+            title: title,
+            artist: artist,
+            album: album,
+            artworkData: artworkData,
+            duration: duration,
+            lyrics: lyrics
+        )
+    }
+
+    /// Extract embedded lyrics using ffmpeg for formats AVAsset can't read (DFF/DSF/DSD).
+    private static func extractLyricsViaFFmpeg(url: URL) -> String? {
+        let ext = url.pathExtension.lowercased()
+        guard ext == "dff" || ext == "dsf" else { return nil }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg")
+        process.arguments = ["-i", url.path, "-f", "ffmetadata", "-"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else { return nil }
+        guard let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) else { return nil }
+
+        // Look for LYRICS= tag in ffmpeg metadata output
+        for line in output.components(separatedBy: .newlines) {
+            if line.hasPrefix("LYRICS=") {
+                let lyrics = String(line.dropFirst("LYRICS=".count))
+                return lyrics.isEmpty ? nil : lyrics
+            }
+        }
+        return nil
     }
 
     /// Synchronously read LYRICS tag from a FLAC file by scanning raw Vorbis comments.

@@ -6,6 +6,7 @@ class QueuePlayerController: NSObject, PlaybackControlling {
     private var playerItems: [AVPlayerItem] = []
     private var tracks: [Track] = []
     private var currentTrackIndex: Int = 0
+    private var tempWAVFiles: [URL] = [] // Track temporary WAV files for cleanup
 
     var onTrackChanged: ((Track?) -> Void)?
     var onPlaybackStateChanged: ((Bool) -> Void)?
@@ -45,6 +46,7 @@ class QueuePlayerController: NSObject, PlaybackControlling {
 
     deinit {
         removeObservers()
+        cleanupTempFiles()
     }
 
     private func setupObservers() {
@@ -111,6 +113,7 @@ class QueuePlayerController: NSObject, PlaybackControlling {
         playerItems.removeAll()
         tracks.removeAll()
         currentTrackIndex = 0
+        cleanupTempFiles()
     }
 
     func setQueue(_ tracks: [Track], startingAt index: Int) {
@@ -150,6 +153,55 @@ class QueuePlayerController: NSObject, PlaybackControlling {
     }
 
     private func createPlayerItem(from track: Track) -> AVPlayerItem {
+        // DFF/DSF (DSD) files need ffmpeg conversion to PCM for AVFoundation playback
+        let ext = track.url.pathExtension.lowercased()
+        if ext == "dff" || ext == "dsf" {
+            if let wavURL = convertDSDToWAV(track.url) {
+                tempWAVFiles.append(wavURL)
+                return AVPlayerItem(url: wavURL)
+            }
+            NSLog("[QueuePlayer] Failed to convert DSD file: %@", track.url.lastPathComponent)
+        }
         return AVPlayerItem(url: track.url)
+    }
+
+    /// Convert DFF/DSF to temporary WAV using ffmpeg
+    private func convertDSDToWAV(_ sourceURL: URL) -> URL? {
+        let tempDir = FileManager.default.temporaryDirectory
+        let tempName = "lx_dsd_\(UUID().uuidString).wav"
+        let tempURL = tempDir.appendingPathComponent(tempName)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg")
+        process.arguments = [
+            "-y",              // Overwrite output
+            "-i", sourceURL.path,
+            "-acodec", "pcm_s16le",  // 16-bit PCM
+            "-ar", "176400",   // DSD64 → 176.4kHz PCM
+            "-ac", "2",        // Stereo
+            tempURL.path
+        ]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 && FileManager.default.fileExists(atPath: tempURL.path) {
+                NSLog("[QueuePlayer] Converted DSD to WAV: %@", tempURL.lastPathComponent)
+                return tempURL
+            }
+        } catch {
+            NSLog("[QueuePlayer] ffmpeg error: %@", error.localizedDescription)
+        }
+        return nil
+    }
+
+    /// Clean up temporary WAV files
+    private func cleanupTempFiles() {
+        for file in tempWAVFiles {
+            try? FileManager.default.removeItem(at: file)
+        }
+        tempWAVFiles.removeAll()
     }
 }

@@ -123,8 +123,10 @@ struct LrcParser {
             let text = nsString.substring(with: match.range(at: 4)).trimmingCharacters(in: .whitespaces)
 
             guard let minutes = Double(min), let seconds = Double(sec) else { return }
-            let milliseconds = Double(ms) ?? 0
-            let time = minutes * 60 + seconds + milliseconds / 1000
+            // 2 digits = centiseconds (÷100), 3 digits = milliseconds (÷1000)
+            let fraction = Double(ms) ?? 0
+            let divisor: Double = ms.count == 2 ? 100.0 : 1000.0
+            let time = minutes * 60 + seconds + fraction / divisor
 
             if !text.isEmpty {
                 lines.append(LyricLine(time: time, text: text))

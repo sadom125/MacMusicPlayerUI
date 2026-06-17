@@ -353,7 +353,7 @@ class PlayerManager: NSObject, ObservableObject {
     }
 
     private func isAudioFile(_ url: URL) -> Bool {
-        let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "ogg", "aiff"]
+        let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "ogg", "aiff", "dff", "dsf"]
         return audioExtensions.contains(url.pathExtension.lowercased())
     }
 

@@ -8,6 +8,17 @@ struct PlaylistPanel: View {
     let currentTrackID: UUID?
     var onTrackTap: ((Int) -> Void)?
     var isHorizontal: Bool = false // true for bottom layout
+    @State private var searchText: String = ""
+
+    /// Filtered tracks based on search text
+    private var filteredTracks: [Track] {
+        if searchText.isEmpty { return tracks }
+        let query = searchText.lowercased()
+        return tracks.filter { track in
+            track.title.lowercased().contains(query) ||
+            track.artist.lowercased().contains(query)
+        }
+    }
 
     var body: some View {
         if isHorizontal {
@@ -19,20 +30,51 @@ struct PlaylistPanel: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.8))
                     Spacer()
-                    Text("\(tracks.count) 首")
+                    Text("\(filteredTracks.count) 首")
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.4))
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
 
+                // Search bar
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.3))
+                    TextField("搜索歌曲...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.8))
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.3))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.white.opacity(0.04))
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+
                 Divider().background(Color.white.opacity(0.1))
 
                 // Track list - vertical scroll (v1 style)
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                            Button(action: { onTrackTap?(index) }) {
+                        ForEach(Array(filteredTracks.enumerated()), id: \.element.id) { index, track in
+                            Button(action: {
+                                if let originalIndex = tracks.firstIndex(where: { $0.id == track.id }) {
+                                    onTrackTap?(originalIndex)
+                                }
+                            }) {
                                 PlaylistRowBottom(
                                     index: index + 1,
                                     title: track.title,
@@ -58,20 +100,51 @@ struct PlaylistPanel: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.8))
                     Spacer()
-                    Text("\(tracks.count) 首")
+                    Text("\(filteredTracks.count) 首")
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.4))
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
 
+                // Search bar
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.3))
+                    TextField("搜索歌曲...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.8))
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.3))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.white.opacity(0.04))
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+
                 Divider().background(Color.white.opacity(0.1))
 
                 // Track list
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                            Button(action: { onTrackTap?(index) }) {
+                        ForEach(Array(filteredTracks.enumerated()), id: \.element.id) { index, track in
+                            Button(action: {
+                                if let originalIndex = tracks.firstIndex(where: { $0.id == track.id }) {
+                                    onTrackTap?(originalIndex)
+                                }
+                            }) {
                                 PlaylistRow(
                                     index: index + 1,
                                     title: track.title,
