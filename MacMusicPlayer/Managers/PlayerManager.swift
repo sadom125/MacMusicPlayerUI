@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import AppKit
 import MediaPlayer
+import AVFoundation
 
 class PlayerManager: NSObject, ObservableObject {
     @Published var playlist: [Track] = []
@@ -45,11 +46,15 @@ class PlayerManager: NSObject, ObservableObject {
         // Find the track in the playlist
         guard let idx = playlist.firstIndex(where: { $0.url.path == trackPath }) else { return }
 
+        // Set flag to prevent savePlaybackPosition in playTrack(at:) from overwriting
+        UserDefaults.standard.set(true, forKey: "_isRestoringPosition")
+
         // Resume: play the track and seek to last position
         playTrack(at: idx)
         // Small delay to let AVPlayerItem ready up
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.seek(to: lastTime)
+            UserDefaults.standard.set(false, forKey: "_isRestoringPosition")
         }
     }
 
@@ -428,7 +433,14 @@ class PlayerManager: NSObject, ObservableObject {
     }
 
     func seek(to time: TimeInterval) {
-        let clamped = max(0, min(time, duration))
+        // Only clamp to duration when we have a valid duration;
+        // duration may be 0 initially for DSD/DFF files before metadata parses.
+        let clamped: TimeInterval
+        if duration > 0 {
+            clamped = max(0, min(time, duration))
+        } else {
+            clamped = max(0, time)
+        }
         let cmTime = CMTime(seconds: clamped, preferredTimescale: 1000)
         queueController.queuePlayer.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
     }
@@ -440,8 +452,11 @@ class PlayerManager: NSObject, ObservableObject {
     func playTrack(at index: Int) {
         guard index >= 0 && index < playlistStore.tracks.count else { return }
 
-        // Save current position before switching tracks
-        savePlaybackPosition()
+        // Save current position before switching tracks (skip during restore)
+        let isRestoring = UserDefaults.standard.bool(forKey: "_isRestoringPosition")
+        if !isRestoring {
+            savePlaybackPosition()
+        }
 
         let tracks = playlistStore.tracks
         queueController.setQueue(tracks, startingAt: index)
