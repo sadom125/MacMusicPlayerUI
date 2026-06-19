@@ -9,7 +9,37 @@ struct MainPlayerView: View {
     @ObservedObject var player: PlayerManager
     @ObservedObject var themeManager = ThemeManager.shared
     @State private var lyrics: [LyricLine] = []
-    @State private var currentLyricIndex: Int = 0
+    /// Cached last-found index — avoids scanning from 0 on every 100ms tick.
+    /// Use -1 to mean "before the first lyric line" (no line active).
+    @State private var lastLyricIndex: Int = -1
+
+    /// Updated from player.currentTime via .onChange — only recomputes when time changes.
+    private func updateLyricIndex(time: TimeInterval) {
+        guard !lyrics.isEmpty else {
+            if lastLyricIndex != -1 { lastLyricIndex = -1 }
+            return
+        }
+        // Common case: time advanced forward → scan from last index.
+        // If time went backward (seek) → scan from beginning.
+        let startIdx = (time > (lastLyricIndex >= 0 ? lyrics[lastLyricIndex].time : -1))
+            ? lastLyricIndex >= 0 ? lastLyricIndex : 0
+            : 0
+
+        var idx = -1
+        for i in startIdx..<lyrics.count {
+            if lyrics[i].time <= time { idx = i } else { break }
+        }
+        // If we started from 0 and didn't find anything, idx stays -1.
+        if idx == -1 && startIdx > 0 {
+            // Time went backward — scan from 0
+            for i in 0..<min(startIdx, lyrics.count) {
+                if lyrics[i].time <= time { idx = i } else { break }
+            }
+        }
+        if idx != lastLyricIndex {
+            lastLyricIndex = idx
+        }
+    }
     @State private var artworkFallbackCache: [UUID: Data?] = [:]
     @AppStorage("bgMode") private var bgMode: String = "albumArt"
     @AppStorage("windowOpacity") private var windowOpacity: Double = 1.0
@@ -67,7 +97,7 @@ struct MainPlayerView: View {
                     // === Main Content: Lyrics + Controls ===
                     ZStack(alignment: .bottom) {
                         // Lyrics fill entire area
-                        LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+                        LyricsView(lyrics: lyrics, currentLineIndex: lastLyricIndex)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                         // Floating Bottom Controls (overlay)
@@ -100,7 +130,7 @@ struct MainPlayerView: View {
                     // === Main Content: Lyrics + Controls ===
                     ZStack(alignment: .bottom) {
                         // Lyrics fill entire area
-                        LyricsView(lyrics: lyrics, currentLineIndex: currentLyricIndex)
+                        LyricsView(lyrics: lyrics, currentLineIndex: lastLyricIndex)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                         // Floating Bottom Controls (overlay)
@@ -154,9 +184,6 @@ struct MainPlayerView: View {
         }
         .onChange(of: player.currentTime) { newTime in
             updateLyricIndex(time: newTime)
-        }
-        .onChange(of: player.currentTrack) { _ in
-            // Initial lyrics index must be reset when track changes
         }
     }
 
@@ -222,6 +249,11 @@ struct MainPlayerView: View {
 
     private func performMiniPlayerSwitch(fullWindow: NSWindow) {
         let sourceFrame = fullWindow.frame
+
+        // Close any existing mini player window first (safety)
+        if let existingMini = (NSApplication.shared.delegate as? AppDelegate)?.miniPlayerWindow {
+            existingMini.close()
+        }
 
         // Create mini player without showing it yet
         let miniWindow = MiniPlayerWindow.show(playerManager: player, showWindow: false)
@@ -626,7 +658,6 @@ struct MainPlayerView: View {
     private func loadLyrics() {
         guard let track = player.currentTrack else {
             lyrics = []
-            currentLyricIndex = 0
             return
         }
 
@@ -636,7 +667,7 @@ struct MainPlayerView: View {
             let parsed = LrcParser.parse(lrcText: lrcText)
             if !parsed.isEmpty {
                 lyrics = parsed
-                currentLyricIndex = 0
+                updateLyricIndex(time: player.currentTime)
                 return
             }
         }
@@ -646,7 +677,7 @@ struct MainPlayerView: View {
             let parsed = LrcParser.parse(lrcText: lrcText)
             if !parsed.isEmpty {
                 lyrics = parsed
-                currentLyricIndex = 0
+                updateLyricIndex(time: player.currentTime)
                 return
             }
         }
@@ -656,7 +687,7 @@ struct MainPlayerView: View {
             let parsed = LrcParser.parse(lrcText: lrcText)
             if !parsed.isEmpty {
                 lyrics = parsed
-                currentLyricIndex = 0
+                updateLyricIndex(time: player.currentTime)
                 return
             }
         }
@@ -674,25 +705,9 @@ struct MainPlayerView: View {
             fallbackLines.append(LyricLine(time: 0, text: track.title))
         }
         lyrics = fallbackLines
-        currentLyricIndex = 0
+        updateLyricIndex(time: player.currentTime)
     }
 
-    private func updateLyricIndex(time: TimeInterval) {
-        guard !lyrics.isEmpty else {
-            if currentLyricIndex != 0 { currentLyricIndex = 0 }
-            return
-        }
-        // Find the last lyric line whose time <= current time
-        var idx = 0
-        for i in 0..<lyrics.count {
-            if lyrics[i].time <= time {
-                idx = i
-            }
-        }
-        if idx != currentLyricIndex {
-            currentLyricIndex = idx
-        }
-    }
 }
 
 // MARK: - Color Hex Extension

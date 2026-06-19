@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Progress bar with a visible thumb and easy drag target.
+/// Progress bar with a large glass thumb, matching the volume/opacity slider style.
 struct ProgressSlider: View {
     @Binding var currentTime: TimeInterval
     let duration: TimeInterval
@@ -30,74 +30,82 @@ struct ProgressSlider: View {
                 .frame(minWidth: 32, alignment: .leading)
 
             GeometryReader { geo in
-                let trackWidth = geo.size.width
-                let thumbSize: CGFloat = 14
-                let trackHeight: CGFloat = 6
-                let centerY = geo.size.height / 2
+                let tw = max(geo.size.width, 1)
+                let thumbSize: CGFloat = 22
+                let trackHeight: CGFloat = 8
+                let p = CGFloat(progress)
+                let centerY: CGFloat = 17  // half of 34
 
-                ZStack {
-                    // Track background
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.white.opacity(0.05))
-                        .frame(width: trackWidth, height: trackHeight)
-                        .position(x: trackWidth / 2, y: centerY)
+                // Gesture lives on a fixed-size Rectangle with a known coordinate space.
+                // All visual elements are overlays on top of it.
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .frame(width: tw, height: 34)
+                    .overlay(
+                        ZStack {
+                            // Track background
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.white.opacity(0.05))
+                                .frame(width: tw, height: trackHeight)
+                                .position(x: tw / 2, y: centerY)
 
-                    // Glow behind fill bar
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(ThemeManager.shared.accent.opacity(breathe ? 0.3 : 0.1))
-                        .frame(width: max(0, trackWidth * CGFloat(progress) - thumbSize / 2), height: trackHeight)
-                        .blur(radius: 6)
-                        .position(x: max(thumbSize / 2, trackWidth * CGFloat(progress) / 2), y: centerY)
+                            // Glow behind fill bar
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(ThemeManager.shared.accent.opacity(breathe ? 0.3 : 0.1))
+                                .frame(width: max(0, tw * p - thumbSize / 2), height: trackHeight)
+                                .blur(radius: 6)
+                                .position(x: max(thumbSize / 2, tw * p / 2), y: centerY)
 
-                    // Fill bar
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    ThemeManager.shared.accent,
-                                    ThemeManager.shared.accent.opacity(0.25)
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: max(0, trackWidth * CGFloat(progress) - thumbSize / 2), height: trackHeight)
-                        .position(x: max(thumbSize / 2, trackWidth * CGFloat(progress) / 2), y: centerY)
+                            // Fill bar
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            ThemeManager.shared.accent,
+                                            ThemeManager.shared.accent.opacity(0.25)
+                                        ]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: max(0, tw * p - thumbSize / 2), height: trackHeight)
+                                .position(x: max(thumbSize / 2, tw * p / 2), y: centerY)
 
-                    // Thumb — glass effect with breathing glow
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .frame(width: thumbSize, height: thumbSize)
-                        .overlay(
+                            // Thumb
                             Circle()
-                                .fill(ThemeManager.shared.accent.opacity(0.8))
-                                .frame(width: 8, height: 8)
-                        )
-                        .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.5 : 0.2), radius: breathe ? 4 : 2)
-                        .position(x: max(thumbSize / 2, trackWidth * CGFloat(progress)), y: centerY)
-                        .scaleEffect(isDragging ? 1.2 : 1.0)
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            let ratio = max(0, min(1, value.location.x / max(trackWidth, 1)))
-                            let newTime = ratio * effectiveDuration
-                            isDragging = true
-                            dragTime = newTime
+                                .fill(.ultraThinMaterial)
+                                .frame(width: thumbSize, height: thumbSize)
+                                .overlay(
+                                    Circle()
+                                        .fill(ThemeManager.shared.accent.opacity(0.9))
+                                        .frame(width: 10, height: 10)
+                                )
+                                .shadow(color: ThemeManager.shared.accent.opacity(breathe ? 0.5 : 0.2), radius: breathe ? 5 : 3)
+                                .position(x: max(thumbSize / 2, tw * p), y: centerY)
+                                .scaleEffect(isDragging ? 1.2 : 1.0)
                         }
-                        .onEnded { value in
-                            let ratio = max(0, min(1, value.location.x / max(trackWidth, 1)))
-                            let newTime = ratio * effectiveDuration
-                            isDragging = false
-                            if effectiveDuration > 0 {
-                                onSeek?(newTime)
-                                currentTime = newTime
+                    )
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let ratio = max(0, min(1, value.location.x / tw))
+                                let newTime = ratio * effectiveDuration
+                                isDragging = true
+                                dragTime = newTime
                             }
-                        }
-                )
-                .contentShape(Rectangle())
+                            .onEnded { value in
+                                let ratio = max(0, min(1, value.location.x / tw))
+                                let newTime = ratio * effectiveDuration
+                                isDragging = false
+                                if effectiveDuration > 0 {
+                                    onSeek?(newTime)
+                                    currentTime = newTime
+                                }
+                            }
+                    )
             }
-            .frame(height: 28)
+            .frame(height: 34)
 
             Text(formatTime(effectiveDuration))
                 .font(.system(size: 11, design: .monospaced))

@@ -31,10 +31,17 @@ class MiniPlayerWindow: NSPanel {
         self.ignoresMouseEvents = false
         self.acceptsMouseMovedEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        self.animationBehavior = .none
+        self.isReleasedWhenClosed = false
 
         hosting.frame = self.contentView?.bounds ?? .zero
         hosting.autoresizingMask = [.width, .height]
         self.contentView = hosting
+    }
+
+    override func close() {
+        self.animations = [:]
+        super.close()
     }
 }
 
