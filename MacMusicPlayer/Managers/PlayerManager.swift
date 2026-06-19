@@ -43,17 +43,14 @@ class PlayerManager: NSObject, ObservableObject {
               let lastTime = UserDefaults.standard.object(forKey: Self.lastPlaybackTimeKey) as? TimeInterval,
               lastTime > 0 else { return }
 
-        // Find the track in the playlist
         guard let idx = playlist.firstIndex(where: { $0.url.path == trackPath }) else { return }
 
-        // Set flag to prevent savePlaybackPosition in playTrack(at:) from overwriting
         UserDefaults.standard.set(true, forKey: "_isRestoringPosition")
-
-        // Resume: play the track and seek to last position
         playTrack(at: idx)
-        // Small delay to let AVPlayerItem ready up
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.seek(to: lastTime)
+            guard let self else { return }
+            self.seek(to: lastTime)
             UserDefaults.standard.set(false, forKey: "_isRestoringPosition")
         }
     }
