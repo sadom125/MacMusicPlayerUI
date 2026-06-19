@@ -155,6 +155,9 @@ struct MainPlayerView: View {
         .onChange(of: player.currentTime) { newTime in
             updateLyricIndex(time: newTime)
         }
+        .onChange(of: player.currentTrack) { _ in
+            // Initial lyrics index must be reset when track changes
+        }
     }
 
     // MARK: - Control Glow
@@ -686,7 +689,6 @@ struct MainPlayerView: View {
                 idx = i
             }
         }
-        // Only update when index actually changes (avoids unnecessary re-renders)
         if idx != currentLyricIndex {
             currentLyricIndex = idx
         }
