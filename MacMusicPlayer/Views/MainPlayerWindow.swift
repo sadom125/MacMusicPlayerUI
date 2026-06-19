@@ -29,6 +29,10 @@ class MainPlayerWindow: NSWindow {
             defer: false
         )
 
+        // Disable ALL window animations to avoid _NSWindowTransformAnimation dealloc crash
+        self.animationBehavior = .none
+        self.isReleasedWhenClosed = false
+
         // Initial title based on current track
         updateTitle()
 
@@ -40,9 +44,6 @@ class MainPlayerWindow: NSWindow {
 
         // Force title text to be visible (white) regardless of background
         self.titleVisibility = .visible
-        if let titleView = self.standardWindowButton(.closeButton)?.superview?.superview {
-            // The NSTitlebarView will get the visual effect background automatically
-        }
 
         // Glass background — NSVisualEffectView as the window's底层
         let glass = NSVisualEffectView()
@@ -88,6 +89,23 @@ class MainPlayerWindow: NSWindow {
     /// When true, text-input keys (Space, arrows) are passed through instead of handled as shortcuts.
     private var isEditingText: Bool {
         firstResponder is NSTextView
+    }
+
+    /// Resign first responder when clicking outside the search field,
+    /// otherwise keyboard shortcuts remain blocked by the stuck focus.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown || event.type == .rightMouseDown {
+            if isEditingText, let contentView = self.contentView {
+                let point = contentView.convert(event.locationInWindow, from: nil)
+                if let hitView = contentView.hitTest(point) {
+                    let isTextField = hitView is NSTextView || hitView.superview is NSTextView
+                    if !isTextField {
+                        self.makeFirstResponder(nil)
+                    }
+                }
+            }
+        }
+        super.sendEvent(event)
     }
 
     /// Handle non-Command keys: Space (play/pause), arrows (seek/volume), Escape (dismiss search).
@@ -171,10 +189,24 @@ class MainPlayerWindow: NSWindow {
     /// Green button calls zoom: — post notifications to hide/show artwork during animation.
     override func zoom(_ sender: Any?) {
         NotificationCenter.default.post(name: .windowWillZoom, object: nil)
+        NSAnimationContext.beginGrouping()
+        NSAnimationContext.current.duration = 0
         super.zoom(sender)
+        NSAnimationContext.endGrouping()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             NotificationCenter.default.post(name: .windowDidZoom, object: nil)
         }
+    }
+
+    /// Override close to avoid animation-related crashes during dealloc.
+    /// Simply disables animations before closing — no view tree manipulation.
+    override func close() {
+        self.animations = [:]
+        super.close()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     /// Force glass view to re-render when app reactivates — fixes black flash.
@@ -201,9 +233,6 @@ class MainPlayerWindow: NSWindow {
         self.appearance = NSAppearance(named: .darkAqua)
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
 }
 
 extension MainPlayerWindow {

@@ -153,7 +153,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        // 1. Remove window content FIRST — this triggers SwiftUI onDisappear,
+        //    which stops NSEvent monitors and Timers in MainPlayerView.
+        //    Without this, those callbacks hold dangling references during dealloc.
+        mainPlayerWindow?.contentView = nil
+        miniPlayerWindow?.contentView = nil
+
+        // 2. Save playback position before stopping
         playerManager.savePlaybackPosition()
+
+        // 3. Stop playback and release AVQueuePlayer resources
+        playerManager.stopAndCleanup()
+
+        // 4. Remove MPRemoteCommandCenter targets
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.removeTarget(nil)
+        commandCenter.pauseCommand.removeTarget(nil)
+        commandCenter.togglePlayPauseCommand.removeTarget(nil)
+        commandCenter.nextTrackCommand.removeTarget(nil)
+        commandCenter.previousTrackCommand.removeTarget(nil)
+
+        // 5. Clear NowPlaying info
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+
         sleepManager.cleanupResourcesOnly()
     }
 
@@ -179,7 +201,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var frame = window.frame
         frame.size.width = targetWidth
         frame.size.height = targetHeight
-        window.setFrame(frame, display: true, animate: true)
+        window.setFrame(frame, display: true, animate: false)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

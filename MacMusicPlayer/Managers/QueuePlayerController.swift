@@ -38,15 +38,48 @@ class QueuePlayerController: NSObject, PlaybackControlling {
         return seconds.isFinite ? seconds : nil
     }
 
+    private var rateObservation: NSKeyValueObservation?
+    private var currentItemObservation: NSKeyValueObservation?
+
     override init() {
         queuePlayer = AVQueuePlayer()
         super.init()
         setupObservers()
     }
 
-    deinit {
-        removeObservers()
+    /// Shutdown for app termination — invalidate KVO BEFORE stopping to prevent
+    /// callbacks from firing during cleanup (which causes autorelease pool crashes).
+    func shutdown() {
+        // 1. Nil callbacks first — prevents any KVO callback from doing work
+        onTrackChanged = nil
+        onPlaybackStateChanged = nil
+        onTrackFinished = nil
+
+        // 2. Invalidate KVO observations — must happen BEFORE stop/clearQueue
+        //    because removeAllItems() triggers currentItem KVO on a background thread
+        rateObservation?.invalidate()
+        rateObservation = nil
+        currentItemObservation?.invalidate()
+        currentItemObservation = nil
+
+        // 3. Remove notification observer
+        NotificationCenter.default.removeObserver(self)
+
+        // 4. Now safe to stop and clear — no KVO will fire
+        queuePlayer.pause()
+        queuePlayer.removeAllItems()
+        playerItems.removeAll()
+        tracks.removeAll()
+
+        // 5. Clean up temp files
         cleanupTempFiles()
+    }
+
+    deinit {
+        // NSKeyValueObservation auto-invalidates on dealloc — no manual remove needed
+        rateObservation = nil
+        currentItemObservation = nil
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func setupObservers() {
@@ -57,22 +90,17 @@ class QueuePlayerController: NSObject, PlaybackControlling {
             object: nil
         )
 
-        queuePlayer.addObserver(self, forKeyPath: "rate", options: [.new], context: nil)
-        queuePlayer.addObserver(self, forKeyPath: "currentItem", options: [.new], context: nil)
-    }
+        rateObservation = queuePlayer.observe(\.rate, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                self?.onPlaybackStateChanged?(self?.isPlaying ?? false)
+            }
+        }
 
-    private func removeObservers() {
-        NotificationCenter.default.removeObserver(self)
-        queuePlayer.removeObserver(self, forKeyPath: "rate")
-        queuePlayer.removeObserver(self, forKeyPath: "currentItem")
-    }
-
-    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        if keyPath == "rate" {
-            onPlaybackStateChanged?(isPlaying)
-        } else if keyPath == "currentItem" {
-            updateCurrentTrackIndex()
-            onTrackChanged?(currentTrack)
+        currentItemObservation = queuePlayer.observe(\.currentItem, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                self?.updateCurrentTrackIndex()
+                self?.onTrackChanged?(self?.currentTrack)
+            }
         }
     }
 

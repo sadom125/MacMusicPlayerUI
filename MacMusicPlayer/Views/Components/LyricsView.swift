@@ -41,6 +41,7 @@ struct LyricsView: View {
                 )
             )
             .onChange(of: currentLineIndex) { newIndex in
+                guard newIndex >= 0 else { return }
                 withAnimation(.easeOut(duration: 0.12)) {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }
@@ -50,6 +51,7 @@ struct LyricsView: View {
 
     private func proximity(_ index: Int) -> Proximity {
         let diff = index - currentLineIndex
+        if currentLineIndex < 0 { return .far }
         if diff == 0 { return .active }
         if abs(diff) <= 2 { return .near }
         return .far

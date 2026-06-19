@@ -30,29 +30,33 @@ class PlayerManager: NSObject, ObservableObject {
 
     // MARK: - Playback Position Persistence
     private static let lastTrackURLKey = "lastPlayedTrackURL"
-    private static let lastPlaybackTimeKey = "lastPlaybackTime"
 
+    /// Remember which track was playing, but NOT the exact time position.
     func savePlaybackPosition() {
-        guard let track = currentTrack, duration > 0 else { return }
+        guard let track = currentTrack else { return }
         UserDefaults.standard.set(track.url.path, forKey: Self.lastTrackURLKey)
-        UserDefaults.standard.set(currentTime, forKey: Self.lastPlaybackTimeKey)
     }
 
+    /// Restore to the saved track, starting from the beginning (time 0).
     func restorePlaybackPosition() {
         guard let trackPath = UserDefaults.standard.string(forKey: Self.lastTrackURLKey),
-              let lastTime = UserDefaults.standard.object(forKey: Self.lastPlaybackTimeKey) as? TimeInterval,
-              lastTime > 0 else { return }
+              let idx = playlist.firstIndex(where: { $0.url.path == trackPath }) else { return }
 
-        guard let idx = playlist.firstIndex(where: { $0.url.path == trackPath }) else { return }
-
-        UserDefaults.standard.set(true, forKey: "_isRestoringPosition")
-        playTrack(at: idx)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self else { return }
-            self.seek(to: lastTime)
-            UserDefaults.standard.set(false, forKey: "_isRestoringPosition")
+        // Advance to the saved track (queue starts at index 0).
+        if idx > 0 {
+            for _ in 0..<idx {
+                _ = queueController.advanceToNext()
+            }
         }
+
+        playlistStore.setCurrentIndex(idx)
+        currentIndex = idx
+        currentTrack = playlist[idx]
+        duration = playlist[idx].duration
+
+        // Seek to the beginning of the track; no offset restore.
+        queueController.queuePlayer.seek(to: .zero)
+        currentTime = 0
     }
 
     var volume: Float {
@@ -142,7 +146,7 @@ class PlayerManager: NSObject, ObservableObject {
     }
 
     private func setupTimeObserver() {
-        let interval = CMTime(seconds: 0.5, preferredTimescale: 10)
+        let interval = CMTime(seconds: 0.1, preferredTimescale: 10)
         timeObserver = queueController.queuePlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
             let secs = CMTimeGetSeconds(time)
@@ -160,6 +164,7 @@ class PlayerManager: NSObject, ObservableObject {
     }
 
     deinit {
+        // stopAndCleanup() may have already removed these
         if let observer = timeObserver {
             queueController.queuePlayer.removeTimeObserver(observer)
         }
@@ -207,13 +212,8 @@ class PlayerManager: NSObject, ObservableObject {
                 nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
             }
 
-            // Add album art if available
-            if let artData = currentTrack.albumArtData {
-                let image = NSImage(data: artData)
-                if let img = image {
-                    nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: img.size) { _ in img }
-                }
-            }
+            // Add album art if available — skip MPMediaItemArtwork to avoid
+            // autorelease pool issues when its handler is called on background threads
         }
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
@@ -429,6 +429,25 @@ class PlayerManager: NSObject, ObservableObject {
         updateNowPlayingInfo()
     }
 
+    /// Full cleanup for app termination — stops playback, cancels all tasks, removes observers.
+    func stopAndCleanup() {
+        // Cancel all background metadata parsing tasks
+        metadataTasks.values.forEach { $0.cancel() }
+        metadataTasks.removeAll()
+
+        // Remove the periodic time observer BEFORE shutting down the player
+        if let observer = timeObserver {
+            queueController.queuePlayer.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+
+        // Shut down the queue controller — invalidates KVO first, then stops/clears
+        queueController.shutdown()
+
+        // Clear NowPlaying info
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
     func seek(to time: TimeInterval) {
         // Only clamp to duration when we have a valid duration;
         // duration may be 0 initially for DSD/DFF files before metadata parses.
@@ -449,11 +468,7 @@ class PlayerManager: NSObject, ObservableObject {
     func playTrack(at index: Int) {
         guard index >= 0 && index < playlistStore.tracks.count else { return }
 
-        // Save current position before switching tracks (skip during restore)
-        let isRestoring = UserDefaults.standard.bool(forKey: "_isRestoringPosition")
-        if !isRestoring {
-            savePlaybackPosition()
-        }
+        savePlaybackPosition()
 
         let tracks = playlistStore.tracks
         queueController.setQueue(tracks, startingAt: index)

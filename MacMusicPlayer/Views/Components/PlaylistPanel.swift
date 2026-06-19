@@ -82,26 +82,41 @@ struct PlaylistPanel: View {
                 Divider().background(Color.white.opacity(0.1))
 
                 // Track list - vertical scroll (v1 style)
-                ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(filteredTracks.enumerated()), id: \.element.id) { index, track in
-                            Button(action: {
-                                if let originalIndex = tracks.firstIndex(where: { $0.id == track.id }) {
-                                    onTrackTap?(originalIndex)
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(filteredTracks.enumerated()), id: \.element.id) { index, track in
+                                Button(action: {
+                                    if let originalIndex = tracks.firstIndex(where: { $0.id == track.id }) {
+                                        onTrackTap?(originalIndex)
+                                    }
+                                }) {
+                                    PlaylistRowBottom(
+                                        index: index + 1,
+                                        title: track.title,
+                                        artist: track.artist,
+                                        duration: track.duration,
+                                        isActive: track.id == currentTrackID
+                                    )
                                 }
-                            }) {
-                                PlaylistRowBottom(
-                                    index: index + 1,
-                                    title: track.title,
-                                    artist: track.artist,
-                                    duration: track.duration,
-                                    isActive: track.id == currentTrackID
-                                )
+                                .buttonStyle(.plain)
+                                .id(track.id)
                             }
-                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .onChange(of: currentTrackID) { newID in
+                        if let id = newID {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo(id, anchor: .center)
+                            }
                         }
                     }
-                    .padding(.vertical, 6)
+                    .onAppear {
+                        if let id = currentTrackID {
+                            proxy.scrollTo(id, anchor: .center)
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
@@ -166,27 +181,42 @@ struct PlaylistPanel: View {
 
                 Divider().background(Color.white.opacity(0.1))
 
-                // Track list
-                ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(filteredTracks.enumerated()), id: \.element.id) { index, track in
-                            Button(action: {
-                                if let originalIndex = tracks.firstIndex(where: { $0.id == track.id }) {
-                                    onTrackTap?(originalIndex)
+                // Track list (right panel)
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(filteredTracks.enumerated()), id: \.element.id) { index, track in
+                                Button(action: {
+                                    if let originalIndex = tracks.firstIndex(where: { $0.id == track.id }) {
+                                        onTrackTap?(originalIndex)
+                                    }
+                                }) {
+                                    PlaylistRow(
+                                        index: index + 1,
+                                        title: track.title,
+                                        artist: track.artist,
+                                        duration: track.duration,
+                                        isActive: track.id == currentTrackID
+                                    )
                                 }
-                            }) {
-                                PlaylistRow(
-                                    index: index + 1,
-                                    title: track.title,
-                                    artist: track.artist,
-                                    duration: track.duration,
-                                    isActive: track.id == currentTrackID
-                                )
+                                .buttonStyle(.plain)
+                                .id(track.id)
                             }
-                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .onChange(of: currentTrackID) { newID in
+                        if let id = newID {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo(id, anchor: .center)
+                            }
                         }
                     }
-                    .padding(.vertical, 6)
+                    .onAppear {
+                        if let id = currentTrackID {
+                            proxy.scrollTo(id, anchor: .center)
+                        }
+                    }
                 }
             }
             .frame(width: 260)
