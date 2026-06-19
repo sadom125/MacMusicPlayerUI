@@ -27,12 +27,46 @@ class PlayerManager: NSObject, ObservableObject {
     private var timeObserver: Any?
     private var metadataTasks: [UUID: Task<Void, Never>] = [:]
 
+    // MARK: - Playback Position Persistence
+    private static let lastTrackURLKey = "lastPlayedTrackURL"
+    private static let lastPlaybackTimeKey = "lastPlaybackTime"
+
+    func savePlaybackPosition() {
+        guard let track = currentTrack, duration > 0 else { return }
+        UserDefaults.standard.set(track.url.path, forKey: Self.lastTrackURLKey)
+        UserDefaults.standard.set(currentTime, forKey: Self.lastPlaybackTimeKey)
+    }
+
+    func restorePlaybackPosition() {
+        guard let trackPath = UserDefaults.standard.string(forKey: Self.lastTrackURLKey),
+              let lastTime = UserDefaults.standard.object(forKey: Self.lastPlaybackTimeKey) as? TimeInterval,
+              lastTime > 0 else { return }
+
+        // Find the track in the playlist
+        guard let idx = playlist.firstIndex(where: { $0.url.path == trackPath }) else { return }
+
+        // Resume: play the track and seek to last position
+        playTrack(at: idx)
+        // Small delay to let AVPlayerItem ready up
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.seek(to: lastTime)
+        }
+    }
+
     var volume: Float {
         get { queueController.volume }
         set {
             queueController.volume = newValue
             UserDefaults.standard.set(newValue, forKey: "SavedVolume")
         }
+    }
+
+    func volumeUp() {
+        volume = min(1.0, volume + 0.05)
+    }
+
+    func volumeDown() {
+        volume = max(0.0, volume - 0.05)
     }
 
 
@@ -262,6 +296,9 @@ class PlayerManager: NSObject, ObservableObject {
             }
 
             NotificationCenter.default.post(name: NSNotification.Name("PlaylistUpdated"), object: nil)
+
+            // Restore last playback position
+            self.restorePlaybackPosition()
         }
     }
 
@@ -357,6 +394,14 @@ class PlayerManager: NSObject, ObservableObject {
         return audioExtensions.contains(url.pathExtension.lowercased())
     }
 
+    func togglePlayPause() {
+        if isPlaying {
+            pause()
+        } else {
+            play()
+        }
+    }
+
     func play() {
         guard let track = currentTrack else {
             print(NSLocalizedString("No current track to play", comment: ""))
@@ -372,6 +417,7 @@ class PlayerManager: NSObject, ObservableObject {
 
     func pause() {
         queueController.pause()
+        savePlaybackPosition()
         print(NSLocalizedString("Paused playback", comment: ""))
         updateNowPlayingInfo()
     }
@@ -382,12 +428,20 @@ class PlayerManager: NSObject, ObservableObject {
     }
 
     func seek(to time: TimeInterval) {
-        let cmTime = CMTime(seconds: time, preferredTimescale: 1000)
+        let clamped = max(0, min(time, duration))
+        let cmTime = CMTime(seconds: clamped, preferredTimescale: 1000)
         queueController.queuePlayer.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    func seek(by delta: TimeInterval) {
+        seek(to: currentTime + delta)
     }
 
     func playTrack(at index: Int) {
         guard index >= 0 && index < playlistStore.tracks.count else { return }
+
+        // Save current position before switching tracks
+        savePlaybackPosition()
 
         let tracks = playlistStore.tracks
         queueController.setQueue(tracks, startingAt: index)
@@ -412,6 +466,9 @@ class PlayerManager: NSObject, ObservableObject {
 
     func playNext() {
         guard !playlistStore.isEmpty else { return }
+
+        // Save current position before switching tracks
+        savePlaybackPosition()
 
         guard let nextIndex = playlistStore.nextIndex(for: playMode) else {
             return
@@ -446,6 +503,9 @@ class PlayerManager: NSObject, ObservableObject {
 
     func playPrevious() {
         guard !playlistStore.isEmpty else { return }
+
+        // Save current position before switching tracks
+        savePlaybackPosition()
 
         switch playMode {
         case .sequential, .random:

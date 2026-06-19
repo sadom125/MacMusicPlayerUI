@@ -82,6 +82,87 @@ class MainPlayerWindow: NSWindow {
         self.acceptsMouseMovedEvents = true
     }
 
+    // MARK: - Keyboard Shortcuts
+
+    /// Check if a text input field is currently the first responder.
+    /// When true, text-input keys (Space, arrows) are passed through instead of handled as shortcuts.
+    private var isEditingText: Bool {
+        firstResponder is NSTextView
+    }
+
+    /// Handle non-Command keys: Space (play/pause), arrows (seek/volume), Escape (dismiss search).
+    override func keyDown(with event: NSEvent) {
+        // If a text field is editing, let it handle keyboard input normally
+        if isEditingText {
+            switch Int(event.keyCode) {
+            case 53:  // Escape — dismiss keyboard focus or clear search
+                self.makeFirstResponder(nil)
+                NotificationCenter.default.post(name: .clearPlaylistSearch, object: nil)
+                return
+            default:
+                super.keyDown(with: event)
+                return
+            }
+        }
+
+        switch Int(event.keyCode) {
+        case 49:  // Space — play/pause
+            playerManager.togglePlayPause()
+
+        case 123:  // Left arrow — seek backward 5s
+            playerManager.seek(by: -5)
+
+        case 124:  // Right arrow — seek forward 5s
+            playerManager.seek(by: 5)
+
+        case 125:  // Down arrow — volume down
+            playerManager.volumeDown()
+
+        case 126:  // Up arrow — volume up
+            playerManager.volumeUp()
+
+        case 53:  // Escape — no action when not editing
+            break
+
+        default:
+            super.keyDown(with: event)
+        }
+    }
+
+    /// Handle Command-key shortcuts: ⌘← (previous), ⌘→ (next), ⌘F (search), ⌘L (toggle playlist).
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Only respond when Command is the only primary modifier (not Cmd+Shift etc.)
+        guard event.modifierFlags.contains(.command),
+              !event.modifierFlags.contains(.shift),
+              !event.modifierFlags.contains(.option),
+              !event.modifierFlags.contains(.control) else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        switch Int(event.keyCode) {
+        case 123:  // ⌘← — previous track
+            playerManager.playPrevious()
+            return true
+
+        case 124:  // ⌘→ — next track
+            playerManager.playNext()
+            return true
+
+        case 3:    // ⌘F — focus search field
+            NotificationCenter.default.post(name: .focusPlaylistSearch, object: nil)
+            return true
+
+        case 37:   // ⌘L — toggle playlist
+            if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+                appDelegate.togglePlaylist()
+            }
+            return true
+
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+    }
+
     /// Override to use zoom instead of fullscreen — avoids AppKit fullscreen transition crash.
     override func toggleFullScreen(_ sender: Any?) {
         zoom(sender)
@@ -137,4 +218,6 @@ extension MainPlayerWindow {
 extension Notification.Name {
     static let windowWillZoom = Notification.Name("MainPlayerWindowWillZoom")
     static let windowDidZoom = Notification.Name("MainPlayerWindowDidZoom")
+    static let focusPlaylistSearch = Notification.Name("FocusPlaylistSearch")
+    static let clearPlaylistSearch = Notification.Name("ClearPlaylistSearch")
 }

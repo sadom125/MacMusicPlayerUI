@@ -153,7 +153,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        playerManager.savePlaybackPosition()
         sleepManager.cleanupResourcesOnly()
+    }
+
+    func applicationWillResignActive(_ notification: Notification) {
+        playerManager.savePlaybackPosition()
+    }
+
+    @objc func togglePlaylist() {
+        guard let window = mainPlayerWindow, !window.isZoomed else {
+            // Just toggle the storage even when zoomed
+            let current = UserDefaults.standard.bool(forKey: "showPlaylist")
+            UserDefaults.standard.set(!current, forKey: "showPlaylist")
+            return
+        }
+
+        let current = UserDefaults.standard.bool(forKey: "showPlaylist")
+        let position = UserDefaults.standard.string(forKey: "playlistPosition") ?? "right"
+        let newState = !current
+        UserDefaults.standard.set(newState, forKey: "showPlaylist")
+
+        let targetWidth: CGFloat = position == "right" ? (newState ? 1180 : 900) : 900
+        let targetHeight: CGFloat = position == "bottom" ? (newState ? 900 : 650) : 650
+        var frame = window.frame
+        frame.size.width = targetWidth
+        frame.size.height = targetHeight
+        window.setFrame(frame, display: true, animate: true)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

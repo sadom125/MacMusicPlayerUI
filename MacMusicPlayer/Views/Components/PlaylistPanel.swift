@@ -9,6 +9,7 @@ struct PlaylistPanel: View {
     var onTrackTap: ((Int) -> Void)?
     var isHorizontal: Bool = false // true for bottom layout
     @State private var searchText: String = ""
+    @FocusState private var isSearchFocused: Bool
 
     /// Filtered tracks based on search text
     private var filteredTracks: [Track] {
@@ -24,6 +25,19 @@ struct PlaylistPanel: View {
         if isHorizontal {
             // Bottom layout: vertical scroll (v1 style)
             VStack(spacing: 0) {
+                // Listen for keyboard shortcut notifications
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .onReceive(NotificationCenter.default.publisher(for: .focusPlaylistSearch)) { _ in
+                        isSearchFocused = true
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .clearPlaylistSearch)) { _ in
+                        if !searchText.isEmpty {
+                            searchText = ""
+                        } else {
+                            isSearchFocused = false
+                        }
+                    }
                 // Header
                 HStack {
                     Text("播放列表")
@@ -46,6 +60,7 @@ struct PlaylistPanel: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .foregroundColor(.white.opacity(0.8))
+                        .focused($isSearchFocused)
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
                             Image(systemName: "xmark.circle.fill")
@@ -94,6 +109,20 @@ struct PlaylistPanel: View {
         } else {
             // Right layout: vertical scroll
             VStack(spacing: 0) {
+                // Listen for keyboard shortcut notifications
+                Color.clear
+                    .frame(width: 0, height: 0)
+                    .onReceive(NotificationCenter.default.publisher(for: .focusPlaylistSearch)) { _ in
+                        isSearchFocused = true
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .clearPlaylistSearch)) { _ in
+                        if !searchText.isEmpty {
+                            searchText = ""
+                        } else {
+                            isSearchFocused = false
+                        }
+                    }
+
                 // Header
                 HStack {
                     Text("播放列表")
@@ -116,6 +145,7 @@ struct PlaylistPanel: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .foregroundColor(.white.opacity(0.8))
+                        .focused($isSearchFocused)
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
                             Image(systemName: "xmark.circle.fill")
