@@ -109,11 +109,11 @@ class MainPlayerWindow: NSWindow {
         case 49:  // Space — play/pause
             playerManager.togglePlayPause()
 
-        case 123:  // Left arrow — seek backward 5s
-            playerManager.seek(by: -5)
+        case 123:  // Left arrow — seek backward 10s
+            playerManager.seek(by: -10)
 
-        case 124:  // Right arrow — seek forward 5s
-            playerManager.seek(by: 5)
+        case 124:  // Right arrow — seek forward 10s
+            playerManager.seek(by: 10)
 
         case 125:  // Down arrow — volume down
             playerManager.volumeDown()
