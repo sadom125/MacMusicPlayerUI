@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Notch area overlay — matches DynamicLakePro design.
+/// Notch area overlay — click to expand.
 struct NotchPlayerView: View {
     @ObservedObject var player: PlayerManager
     @Binding var isExpanded: Bool
@@ -20,6 +20,7 @@ struct NotchPlayerView: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
+        .contentShape(Rectangle()) // Make entire area tappable
         .onTapGesture {
             if let panel = NSApp.windows.first(where: { $0 is NotchPlayerWindow }) as? NotchPlayerWindow {
                 panel.toggleExpanded()
@@ -35,11 +36,11 @@ struct NotchPlayerView: View {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 22, height: 22)
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .frame(width: 20, height: 20)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 Image(systemName: "music.note")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white)
             }
 
@@ -49,48 +50,44 @@ struct NotchPlayerView: View {
                 EqualizerView()
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .frame(width: width, height: height)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.black)
-                .padding(.vertical, 0)
         )
-        .clipped()
     }
 
     // MARK: - Expanded
 
     private func expandedContent(width: CGFloat, height: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Content area
+            // Album art + info
             HStack(spacing: 14) {
-                // Album art
                 if let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 64, height: 64)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .frame(width: 72, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
                 } else {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(Color.white.opacity(0.1))
-                        .frame(width: 64, height: 64)
+                        .frame(width: 72, height: 72)
                         .overlay(
                             Image(systemName: "music.note")
-                                .font(.system(size: 24))
+                                .font(.system(size: 28))
                                 .foregroundColor(.white.opacity(0.3))
                         )
                 }
 
-                // Info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(player.currentTrack?.title ?? "Not Playing")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                     Text(player.currentTrack?.artist ?? "")
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.5))
                         .lineLimit(1)
                 }
@@ -101,11 +98,11 @@ struct NotchPlayerView: View {
                     EqualizerView()
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
 
             // Progress bar
-            VStack(spacing: 4) {
+            VStack(spacing: 5) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 2)
@@ -120,46 +117,46 @@ struct NotchPlayerView: View {
 
                 HStack {
                     Text(formatTime(player.currentTime))
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.4))
                     Spacer()
                     Text(formatTime(player.duration))
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.4))
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 10)
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
 
             // Controls
-            HStack(spacing: 36) {
+            HStack(spacing: 40) {
                 Button(action: { player.playPrevious() }) {
                     Image(systemName: "backward.fill")
-                        .font(.system(size: 20))
+                        .font(.system(size: 22))
                         .foregroundColor(.white.opacity(0.8))
                 }
                 .buttonStyle(.plain)
 
                 Button(action: { player.isPlaying ? player.pause() : player.play() }) {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 30))
+                        .font(.system(size: 34))
                         .foregroundColor(.white)
                 }
                 .buttonStyle(.plain)
 
                 Button(action: { player.playNext() }) {
                     Image(systemName: "forward.fill")
-                        .font(.system(size: 20))
+                        .font(.system(size: 22))
                         .foregroundColor(.white.opacity(0.8))
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.top, 12)
-            .padding(.bottom, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 20)
         }
         .frame(width: width, height: height)
         .background(
-            NotchExpandedBg(radius: 20)
+            NotchExpandedBg(radius: 22)
                 .fill(Color.black)
         )
     }
