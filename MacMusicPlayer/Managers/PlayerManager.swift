@@ -28,6 +28,10 @@ class PlayerManager: NSObject, ObservableObject {
     private var timeObserver: Any?
     private var metadataTasks: [UUID: Task<Void, Never>] = [:]
 
+    // MARK: - File System Watcher
+    private var fileSystemSource: DispatchSourceFileSystemObject?
+    private var watchedFolderURL: URL?
+
     // MARK: - Playback Position Persistence
     private static let lastTrackURLKey = "lastPlayedTrackURL"
 
@@ -310,7 +314,171 @@ class PlayerManager: NSObject, ObservableObject {
 
             // Restore last playback position
             self.restorePlaybackPosition()
+
+            // Start file system watcher after loading
+            self.startFileSystemWatcher(for: folderURL)
         }
+    }
+
+    // MARK: - Silent Refresh (no playback interruption)
+
+    /// Silently scan the folder and add/remove tracks without stopping playback.
+    func silentRefreshLibrary() {
+        guard let folderURL = watchedFolderURL else { return }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            let fileManager = FileManager.default
+
+            guard let enumerator = fileManager.enumerator(at: folderURL,
+                                                        includingPropertiesForKeys: [.isRegularFileKey],
+                                                        options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return }
+
+            // Collect current audio files on disk
+            var diskFiles: Set<String> = []
+            for case let fileURL as URL in enumerator {
+                if self.isAudioFile(fileURL) {
+                    diskFiles.insert(fileURL.standardized.path)
+                }
+            }
+
+            let currentURLs = Set(self.playlist.map { $0.url.standardized.path })
+
+            // Find new and removed files
+            let newURLs = diskFiles.subtracting(currentURLs)
+            let removedURLs = currentURLs.subtracting(diskFiles)
+
+            guard !newURLs.isEmpty || !removedURLs.isEmpty else { return }
+
+            DispatchQueue.main.async {
+                // Remember what was playing
+                let playingTrackID = self.currentTrack?.id
+                let wasPlaying = self.isPlaying
+                let savedTime = self.currentTime
+
+                // Remove deleted tracks
+                if !removedURLs.isEmpty {
+                    self.playlist.removeAll { removedURLs.contains($0.url.standardized.path) }
+                    self.playlistStore.setTracks(self.playlist)
+
+                    // If the current track was removed, stop playback
+                    if let playingID = playingTrackID,
+                       !self.playlist.contains(where: { $0.id == playingID }) {
+                        self.queueController.clearQueue()
+                        self.currentTrack = nil
+                        self.isPlaying = false
+                        self.currentIndex = 0
+                    }
+                }
+
+                // Add new tracks
+                var newTracks: [Track] = []
+                for pathString in newURLs {
+                    let fileURL = URL(fileURLWithPath: pathString)
+                    let fileName = fileURL.deletingPathExtension().lastPathComponent
+                    var title = fileName
+                    var artist = NSLocalizedString("Unknown Artist", comment: "Default artist name when parsing filenames")
+
+                    if let range = fileName.range(of: " - ") {
+                        title = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        artist = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    } else if let range = fileName.range(of: "-") {
+                        title = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        artist = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    }
+
+                    let track = Track(
+                        id: UUID(),
+                        title: title,
+                        artist: artist,
+                        album: NSLocalizedString("Unknown Album", comment: "Default album name"),
+                        albumArtData: nil,
+                        duration: 0,
+                        url: fileURL,
+                        lyrics: nil
+                    )
+                    newTracks.append(track)
+
+                    // Async metadata parsing
+                    let trackID = track.id
+                    let capturedURL = fileURL
+                    let capturedTrack = track
+                    self.metadataTasks[trackID] = Task { [weak self] in
+                        guard let self else { return }
+                        guard let meta = await MetadataParser.parse(from: capturedURL) else { return }
+                        self.updateTrackDirect(capturedTrack, with: meta)
+                    }
+                }
+
+                // Merge: existing + new, then sort
+                let merged = self.playlist + newTracks
+                let sorted = merged.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                self.playlist = sorted
+                self.playlistStore.setTracks(sorted)
+
+                // Rebuild queue while preserving current track
+                if let playingID = playingTrackID,
+                   let newIdx = sorted.firstIndex(where: { $0.id == playingID }) {
+                    self.currentIndex = newIdx
+                    self.currentTrack = sorted[newIdx]
+                    self.playlistStore.setCurrentIndex(newIdx)
+                    self.queueController.setQueue(sorted, startingAt: newIdx)
+                    // Seek back to where we were
+                    if wasPlaying {
+                        self.queueController.queuePlayer.seek(to: CMTime(seconds: savedTime, preferredTimescale: 10))
+                        self.queueController.play()
+                    }
+                } else if !sorted.isEmpty && self.currentTrack == nil {
+                    self.currentIndex = 0
+                    self.currentTrack = sorted[0]
+                    self.playlistStore.setCurrentIndex(0)
+                    self.queueController.setQueue(sorted, startingAt: 0)
+                }
+
+                NotificationCenter.default.post(name: NSNotification.Name("PlaylistUpdated"), object: nil)
+            }
+        }
+    }
+
+    // MARK: - File System Watcher
+
+    private func startFileSystemWatcher(for folderURL: URL) {
+        stopFileSystemWatcher()
+
+        let fd = open(folderURL.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .rename, .delete],
+            queue: .global(qos: .utility)
+        )
+
+        var debounceWorkItem: DispatchWorkItem?
+
+        source.setEventHandler { [weak self] in
+            // Debounce: wait 1.5s after last event before refreshing
+            debounceWorkItem?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.silentRefreshLibrary()
+            }
+            debounceWorkItem = work
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1.5, execute: work)
+        }
+
+        source.setCancelHandler {
+            close(fd)
+        }
+
+        source.resume()
+        fileSystemSource = source
+        watchedFolderURL = folderURL
+    }
+
+    private func stopFileSystemWatcher() {
+        fileSystemSource?.cancel()
+        fileSystemSource = nil
+        watchedFolderURL = nil
     }
 
     /// Sync AVPlayer's accurate duration back to the Track model.
@@ -565,11 +733,7 @@ class PlayerManager: NSObject, ObservableObject {
 
     @MainActor
     @objc func refreshMusicLibrary() {
-        if let library = (NSApplication.shared.delegate as? AppDelegate)?.libraryManager.currentLibrary {
-            loadLibrary(library)
-        } else {
-            loadSavedMusicFolder()
-        }
+        silentRefreshLibrary()
     }
 
 
