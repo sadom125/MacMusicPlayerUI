@@ -15,6 +15,7 @@ struct ListeningHeatmap: View {
     @State private var refreshTrigger: Bool = false
     @State private var lastRefreshDay: String = ""
     @State private var midnightTimer: Timer?
+    @State private var dataRefreshTimer: Timer?
 
     private var primaryText: Color { themeManager.isDarkMode ? .white : .black }
     private var cardBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.05) : Color.black.opacity(0.04) }
@@ -85,10 +86,21 @@ struct ListeningHeatmap: View {
         .onAppear {
             lastRefreshDay = Self.todayString()
             startMidnightTimer()
+            startDataRefreshTimer()
+            // Listen for immediate data changes
+            NotificationCenter.default.addObserver(
+                forName: PlaybackHistory.dataDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                refreshTrigger.toggle()
+            }
         }
         .onDisappear {
             midnightTimer?.invalidate()
             midnightTimer = nil
+            dataRefreshTimer?.invalidate()
+            dataRefreshTimer = nil
         }
     }
 
@@ -108,6 +120,15 @@ struct ListeningHeatmap: View {
                 DispatchQueue.main.async {
                     refreshTrigger.toggle()
                 }
+            }
+        }
+    }
+
+    /// 每 10 秒刷新一次数据，确保 @ObservedObject 变化能反映到 UI
+    private func startDataRefreshTimer() {
+        dataRefreshTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
+            DispatchQueue.main.async {
+                refreshTrigger.toggle()
             }
         }
     }

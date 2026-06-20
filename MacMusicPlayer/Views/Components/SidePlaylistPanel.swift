@@ -330,6 +330,7 @@ private struct TrackRow: View {
 
 class PlaybackHistory: ObservableObject {
     static let shared = PlaybackHistory()
+    static let dataDidChangeNotification = Notification.Name("PlaybackHistoryDataDidChange")
 
     private let maxHistorySize = 50
     private let historyKey = "PlaybackHistory"
@@ -360,6 +361,11 @@ class PlaybackHistory: ObservableObject {
         dailyPlayCounts[today, default: 0] += 1
 
         saveToStorage()
+
+        // Notify observers (heatmap) that data changed
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Self.dataDidChangeNotification, object: nil)
+        }
     }
 
     func clear() {
