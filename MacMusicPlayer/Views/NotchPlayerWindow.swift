@@ -4,12 +4,18 @@ import AppKit
 /// Borderless panel covering the MacBook notch — Dynamic Island style.
 class NotchPlayerWindow: NSPanel {
     private let hostingView: NSHostingView<AnyView>
+    private var expandedState = false
+    private var mouseMonitor: Any?
+    private var hoverTimer: Timer?
+    private weak var playerManager: PlayerManager?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
     init(playerManager: PlayerManager) {
-        let contentView = NotchPlayerView(player: playerManager)
+        self.playerManager = playerManager
+
+        let contentView = NotchPlayerView(player: playerManager, isExpanded: .constant(false))
 
         let hosting = NSHostingView(rootView: AnyView(contentView))
         self.hostingView = hosting
@@ -20,6 +26,19 @@ class NotchPlayerWindow: NSPanel {
             backing: .buffered,
             defer: false
         )
+
+        // Now set up the binding that references self
+        let binding = Binding<Bool>(
+            get: { [weak self] in self?.expandedState ?? false },
+            set: { [weak self] value in
+                self?.expandedState = value
+                self?.refreshView()
+                self?.positionAtNotch(collapsed: !value)
+            }
+        )
+
+        let view = NotchPlayerView(player: playerManager, isExpanded: binding)
+        hostingView.rootView = AnyView(view)
 
         self.isFloatingPanel = true
         self.isOpaque = false
@@ -38,29 +57,82 @@ class NotchPlayerWindow: NSPanel {
             .ignoresCycle,
         ]
 
-        // Above menu bar
         self.level = .statusBar
 
-        hosting.frame = NSRect(x: 0, y: 0, width: 200, height: 34)
-        hosting.autoresizingMask = [.width, .height]
-        self.contentView = hosting
+        hostingView.frame = NSRect(x: 0, y: 0, width: 200, height: 34)
+        hostingView.autoresizingMask = [.width, .height]
+        self.contentView = hostingView
 
         positionAtNotch(collapsed: true)
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleExpandChange(_:)),
-            name: NSNotification.Name("NotchPlayerExpandChanged"),
-            object: nil
-        )
+        startHoverMonitor()
     }
 
-    @objc private func handleExpandChange(_ notification: Notification) {
-        guard let expanded = notification.userInfo?["expanded"] as? Bool else { return }
+    private func refreshView() {
+        guard let pm = playerManager else { return }
+        let binding = Binding<Bool>(
+            get: { [weak self] in self?.expandedState ?? false },
+            set: { [weak self] value in
+                self?.expandedState = value
+                self?.refreshView()
+                self?.positionAtNotch(collapsed: !value)
+            }
+        )
+        hostingView.rootView = AnyView(NotchPlayerView(player: pm, isExpanded: binding))
+    }
+
+    // MARK: - Hover Detection
+
+    private func startHoverMonitor() {
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+            guard let self else { return }
+            let mouseLocation = NSEvent.mouseLocation
+            let wf = self.frame
+
+            // Close hover zone
+            let closeRect = NSRect(
+                x: wf.origin.x - 60,
+                y: wf.origin.y - 30,
+                width: wf.width + 120,
+                height: wf.height + 50
+            )
+
+            // Far zone (for collapse)
+            let farRect = NSRect(
+                x: wf.origin.x - 150,
+                y: wf.origin.y - 80,
+                width: wf.width + 300,
+                height: wf.height + 160
+            )
+
+            if closeRect.contains(mouseLocation) {
+                if !self.expandedState {
+                    self.hoverTimer?.invalidate()
+                    self.hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: false) { [weak self] _ in
+                        DispatchQueue.main.async {
+                            self?.setExpanded(true)
+                        }
+                    }
+                }
+            } else if !farRect.contains(mouseLocation) && self.expandedState {
+                self.hoverTimer?.invalidate()
+                self.hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { [weak self] _ in
+                    DispatchQueue.main.async {
+                        self?.setExpanded(false)
+                    }
+                }
+            }
+        }
+    }
+
+    private func setExpanded(_ expanded: Bool) {
+        guard expandedState != expanded else { return }
+        expandedState = expanded
+        refreshView()
         positionAtNotch(collapsed: !expanded)
     }
 
-    /// Position window at notch. Collapsed = covers notch; expanded = drops down.
+    // MARK: - Positioning
+
     func positionAtNotch(collapsed: Bool = true) {
         guard let screen = NSScreen.main else { return }
         guard screen.safeAreaInsets.top > 0 else {
@@ -71,10 +143,8 @@ class NotchPlayerWindow: NSPanel {
         let screenFrame = screen.frame
         let notchHeight = screen.safeAreaInsets.top
 
-        // Collapsed: covers notch + extends slightly left/right
-        // Expanded: extends downward from notch
         let windowWidth: CGFloat = collapsed ? 200 : 500
-        let windowHeight: CGFloat = collapsed ? notchHeight : notchHeight + 90
+        let windowHeight: CGFloat = collapsed ? notchHeight : notchHeight + 110
 
         let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
@@ -87,12 +157,20 @@ class NotchPlayerWindow: NSPanel {
     }
 
     override func close() {
+        if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMonitor = nil
+        }
+        hoverTimer?.invalidate()
+        hoverTimer = nil
         self.animations = [:]
-        NotificationCenter.default.removeObserver(self)
         super.close()
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
+        if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        hoverTimer?.invalidate()
     }
 }
