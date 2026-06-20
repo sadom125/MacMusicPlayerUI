@@ -101,7 +101,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if notchPlayerWindow == nil {
             notchPlayerWindow = NotchPlayerWindow(playerManager: playerManager)
         }
-        notchPlayerWindow?.positionAtNotch()
+        // Notch player auto-positions itself
         notchPlayerWindow?.orderFront(nil)
     }
 
