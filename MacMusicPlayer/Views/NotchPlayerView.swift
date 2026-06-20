@@ -28,14 +28,12 @@ struct NotchPlayerView: View {
         }
     }
 
-    // MARK: - Collapsed: flat top, rounded bottom, no icon, just equalizer
+    // MARK: - Collapsed: flat top, rounded bottom, just equalizer
 
     private func collapsedContent(width: CGFloat, height: CGFloat) -> some View {
         HStack {
             Spacer()
-            if player.isPlaying {
-                EqualizerView()
-            }
+            EqualizerView()
             Spacer()
         }
         .frame(width: width, height: height)
