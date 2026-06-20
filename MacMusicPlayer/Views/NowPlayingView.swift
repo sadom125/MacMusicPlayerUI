@@ -8,8 +8,6 @@ struct NowPlayingView: View {
     var isPlaying: Bool = false
 
     @ObservedObject var themeManager = ThemeManager.shared
-    @State private var rotationAngle: Double = 0
-    @State private var rotationTimer: Timer?
 
     private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.3) : Color.black.opacity(0.3) }
     private var placeholderBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.1) : Color.black.opacity(0.08) }
@@ -22,11 +20,9 @@ struct NowPlayingView: View {
             // Right: Lyrics
             lyricsSection
         }
-        .padding(.horizontal, 60)
+        .padding(.leading, 80)
+        .padding(.trailing, 40)
         .padding(.vertical, 40)
-        .onAppear { updateRotation() }
-        .onChange(of: isPlaying) { _ in updateRotation() }
-        .onDisappear { stopRotation() }
     }
 
     // MARK: - Vinyl Record
@@ -46,15 +42,20 @@ struct NowPlayingView: View {
                     .frame(width: CGFloat(280 - i * 20), height: CGFloat(280 - i * 20))
             }
 
-            // Album art (center disc, rotating)
+            // Album art (center disc, rotating via TimelineView)
             if let data = artworkData, let nsImage = NSImage(data: data) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 180, height: 180)
-                    .clipShape(Circle())
-                    .rotationEffect(.degrees(rotationAngle))
+                TimelineView(.periodic(from: .now, by: 1.0 / 60.0)) { context in
+                    let elapsed = context.date.timeIntervalSinceReferenceDate
+                    let angle = isPlaying ? (elapsed.truncatingRemainder(dividingBy: 8.0) / 8.0) * 360.0 : 0
+
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 180, height: 180)
+                        .clipShape(Circle())
+                        .rotationEffect(.degrees(angle))
+                }
             } else {
                 // Placeholder
                 Circle()
@@ -77,30 +78,6 @@ struct NowPlayingView: View {
                 .fill(Color.white.opacity(0.3))
                 .frame(width: 4, height: 4)
         }
-    }
-
-    // MARK: - Rotation Control
-
-    private func updateRotation() {
-        if isPlaying {
-            startRotation()
-        } else {
-            stopRotation()
-        }
-    }
-
-    private func startRotation() {
-        rotationTimer?.invalidate()
-        rotationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
-            DispatchQueue.main.async {
-                self.rotationAngle += 360.0 / (8.0 * 60.0)
-            }
-        }
-    }
-
-    private func stopRotation() {
-        rotationTimer?.invalidate()
-        rotationTimer = nil
     }
 
     private var lyricsSection: some View {
