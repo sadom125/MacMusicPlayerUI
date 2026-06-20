@@ -112,6 +112,7 @@ struct MainPlayerView: View {
         }
         .onChange(of: player.currentTrack) { _ in
             loadLyrics()
+            ensureCurrentTrackMetadata()
             if let window = NSApplication.shared.keyWindow as? MainPlayerWindow {
                 window.updateTitle()
             }
@@ -180,6 +181,23 @@ struct MainPlayerView: View {
         guard bgMode.hasPrefix("solid:") else { return nil }
         let hex = String(bgMode.dropFirst("solid:".count))
         return Color(hex: hex)
+    }
+
+    // MARK: - Metadata Refresh
+
+    /// Ensure the current track has artwork loaded. If artwork is nil (async parsing
+    /// hasn't finished yet), parse synchronously so the UI shows it immediately.
+    private func ensureCurrentTrackMetadata() {
+        guard let track = player.currentTrack else { return }
+        guard track.albumArtData == nil else { return }
+
+        // Parse artwork synchronously in background, then update track
+        Task.detached(priority: .userInitiated) {
+            guard let meta = await MetadataParser.parse(from: track.url) else { return }
+            await MainActor.run {
+                self.player.updateTrackFromUI(track, with: meta)
+            }
+        }
     }
 
     // MARK: - Lyrics Loading

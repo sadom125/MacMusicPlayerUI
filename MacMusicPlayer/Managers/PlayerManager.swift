@@ -568,6 +568,11 @@ class PlayerManager: NSObject, ObservableObject {
         }
     }
 
+    /// Public method for views to update track metadata (e.g. sync artwork load).
+    func updateTrackFromUI(_ track: Track, with meta: MetadataParser.Metadata) {
+        updateTrackDirect(track, with: meta)
+    }
+
     private func isAudioFile(_ url: URL) -> Bool {
         let audioExtensions = ["mp3", "m4a", "wav", "aac", "flac", "ogg", "aiff", "dff", "dsf"]
         return audioExtensions.contains(url.pathExtension.lowercased())
