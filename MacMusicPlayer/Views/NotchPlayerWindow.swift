@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Borderless panel that sits at the MacBook notch area, acting as a Dynamic Island.
+/// Borderless panel covering the MacBook notch — Dynamic Island style.
 class NotchPlayerWindow: NSPanel {
     private let hostingView: NSHostingView<AnyView>
 
@@ -15,7 +15,7 @@ class NotchPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 50, height: 34),
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 34),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -41,13 +41,12 @@ class NotchPlayerWindow: NSPanel {
         // Above menu bar
         self.level = .statusBar
 
-        hosting.frame = NSRect(x: 0, y: 0, width: 60, height: 30)
+        hosting.frame = NSRect(x: 0, y: 0, width: 200, height: 34)
         hosting.autoresizingMask = [.width, .height]
         self.contentView = hosting
 
         positionAtNotch(collapsed: true)
 
-        // Listen for expand/collapse changes
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleExpandChange(_:)),
@@ -61,7 +60,7 @@ class NotchPlayerWindow: NSPanel {
         positionAtNotch(collapsed: !expanded)
     }
 
-    /// Position the window at the notch. Collapsed = small pill, expanded = wider panel.
+    /// Position window at notch. Collapsed = covers notch; expanded = drops down.
     func positionAtNotch(collapsed: Bool = true) {
         guard let screen = NSScreen.main else { return }
         guard screen.safeAreaInsets.top > 0 else {
@@ -70,9 +69,12 @@ class NotchPlayerWindow: NSPanel {
         }
 
         let screenFrame = screen.frame
+        let notchHeight = screen.safeAreaInsets.top
 
-        let windowWidth: CGFloat = collapsed ? 60 : 480
-        let windowHeight: CGFloat = collapsed ? 30 : 80
+        // Collapsed: covers notch + extends slightly left/right
+        // Expanded: extends downward from notch
+        let windowWidth: CGFloat = collapsed ? 200 : 500
+        let windowHeight: CGFloat = collapsed ? notchHeight : notchHeight + 90
 
         let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
