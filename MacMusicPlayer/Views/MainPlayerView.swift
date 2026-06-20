@@ -131,7 +131,8 @@ struct MainPlayerView: View {
             NowPlayingView(
                 artworkData: currentArtworkData,
                 lyrics: lyrics,
-                currentLineIndex: lastLyricIndex
+                currentLineIndex: lastLyricIndex,
+                isPlaying: player.isPlaying
             )
         }
     }

@@ -1,20 +1,22 @@
 import SwiftUI
 
-/// Now Playing view with horizontal layout: album art left, lyrics right.
+/// Now Playing view with horizontal layout: vinyl record left, lyrics right.
 struct NowPlayingView: View {
     let artworkData: Data?
     let lyrics: [LyricLine]
     let currentLineIndex: Int
+    var isPlaying: Bool = false
 
     @ObservedObject var themeManager = ThemeManager.shared
+    @State private var rotationAngle: Double = 0
 
     private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.3) : Color.black.opacity(0.3) }
     private var placeholderBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.1) : Color.black.opacity(0.08) }
 
     var body: some View {
         HStack(spacing: 40) {
-            // Left: Album Art
-            albumArtSection
+            // Left: Vinyl Record
+            vinylSection
 
             // Right: Lyrics
             lyricsSection
@@ -23,27 +25,70 @@ struct NowPlayingView: View {
         .padding(.vertical, 40)
     }
 
-    private var albumArtSection: some View {
-        Group {
+    // MARK: - Vinyl Record
+
+    private var vinylSection: some View {
+        ZStack {
+            // Outer disc (black vinyl)
+            Circle()
+                .fill(Color.black)
+                .frame(width: 320, height: 320)
+                .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 10)
+
+            // Vinyl grooves
+            ForEach(0..<5) { i in
+                Circle()
+                    .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                    .frame(width: CGFloat(280 - i * 20), height: CGFloat(280 - i * 20))
+            }
+
+            // Album art (center disc, rotating)
             if let data = artworkData, let nsImage = NSImage(data: data) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 320, height: 320)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
+                    .frame(width: 180, height: 180)
+                    .clipShape(Circle())
+                    .rotationEffect(.degrees(rotationAngle))
+                    .onAppear { startRotation() }
+                    .onChange(of: isPlaying) { playing in
+                        if playing { startRotation() } else { stopRotation() }
+                    }
             } else {
                 // Placeholder
-                RoundedRectangle(cornerRadius: 16)
+                Circle()
                     .fill(placeholderBg)
-                    .frame(width: 320, height: 320)
+                    .frame(width: 180, height: 180)
                     .overlay(
                         Image(systemName: "music.note")
-                            .font(.system(size: 60))
+                            .font(.system(size: 50))
                             .foregroundColor(tertiaryText)
                     )
             }
+
+            // Center hole
+            Circle()
+                .fill(Color.black)
+                .frame(width: 12, height: 12)
+
+            // Center dot
+            Circle()
+                .fill(Color.white.opacity(0.3))
+                .frame(width: 4, height: 4)
+        }
+    }
+
+    private func startRotation() {
+        guard isPlaying else { return }
+        withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
+            rotationAngle = 360
+        }
+    }
+
+    private func stopRotation() {
+        withAnimation(.easeOut(duration: 0.5)) {
+            rotationAngle = 0
         }
     }
 
