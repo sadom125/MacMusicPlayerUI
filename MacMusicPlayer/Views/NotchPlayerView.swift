@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Notch area overlay — solid black, click to expand.
+/// Notch area overlay — matches DynamicLakePro design.
 struct NotchPlayerView: View {
     @ObservedObject var player: PlayerManager
     @Binding var isExpanded: Bool
@@ -27,51 +27,51 @@ struct NotchPlayerView: View {
         }
     }
 
-    // MARK: - Collapsed: exactly covers the notch
+    // MARK: - Collapsed: wider than notch, icon left, equalizer right
 
     private func collapsedContent(width: CGFloat, height: CGFloat) -> some View {
         HStack(spacing: 0) {
-            // Left: music icon (like DynamicLakePro)
+            // Left: music icon
             if let data = artworkData, let nsImage = NSImage(data: data) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 18, height: 18)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .frame(width: 22, height: 22)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
             } else {
                 Image(systemName: "music.note")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white)
             }
 
             Spacer()
 
-            // Right: playing indicator
+            // Right: equalizer (always shown when playing)
             if player.isPlaying {
                 EqualizerView()
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .frame(width: width, height: height)
         .background(Color.black)
-        .clipShape(NotchShape())
+        .clipShape(NotchBarShape())
     }
 
     // MARK: - Expanded
 
     private func expandedContent(width: CGFloat, height: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Top bar (connector to notch)
+            // Top connector bar
             HStack(spacing: 0) {
                 if let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 18, height: 18)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .frame(width: 22, height: 22)
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
                 } else {
                     Image(systemName: "music.note")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white)
                 }
                 Spacer()
@@ -79,82 +79,107 @@ struct NotchPlayerView: View {
                     EqualizerView()
                 }
             }
-            .padding(.horizontal, 12)
-            .frame(height: 32)
+            .padding(.horizontal, 14)
+            .frame(height: 36)
 
-            Divider().background(Color.white.opacity(0.15))
-
-            // Content
+            // Main content
             HStack(spacing: 14) {
-                // Album art
+                // Album art (large, rounded)
                 if let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 56, height: 56)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .frame(width: 64, height: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
                 } else {
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(Color.white.opacity(0.1))
-                        .frame(width: 56, height: 56)
-                        .overlay(Image(systemName: "music.note").font(.system(size: 20)).foregroundColor(.white.opacity(0.4)))
+                        .frame(width: 64, height: 64)
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white.opacity(0.3))
+                        )
                 }
 
-                VStack(alignment: .leading, spacing: 3) {
+                // Track info
+                VStack(alignment: .leading, spacing: 4) {
                     Text(player.currentTrack?.title ?? "Not Playing")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                     Text(player.currentTrack?.artist ?? "")
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundColor(.white.opacity(0.5))
                         .lineLimit(1)
                 }
+
                 Spacer()
+
+                // Equalizer on right
+                if player.isPlaying {
+                    EqualizerView()
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.horizontal, 18)
+            .padding(.top, 6)
 
             // Progress bar
-            VStack(spacing: 3) {
+            VStack(spacing: 4) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 1.5).fill(Color.white.opacity(0.2)).frame(height: 3)
-                        RoundedRectangle(cornerRadius: 1.5).fill(Color.white.opacity(0.7))
-                            .frame(width: geo.size.width * progressRatio, height: 3)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.white.opacity(0.2))
+                            .frame(height: 4)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.white.opacity(0.7))
+                            .frame(width: geo.size.width * progressRatio, height: 4)
                     }
                 }
-                .frame(height: 3)
+                .frame(height: 4)
+
                 HStack {
-                    Text(formatTime(player.currentTime)).font(.system(size: 9)).foregroundColor(.white.opacity(0.35))
+                    Text(formatTime(player.currentTime))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
                     Spacer()
-                    Text(formatTime(player.duration)).font(.system(size: 9)).foregroundColor(.white.opacity(0.35))
+                    Text(formatTime(player.duration))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
 
-            // Controls
-            HStack(spacing: 28) {
+            // Controls (large, centered)
+            HStack(spacing: 36) {
                 Button(action: { player.playPrevious() }) {
-                    Image(systemName: "backward.fill").font(.system(size: 16)).foregroundColor(.white.opacity(0.8))
-                }.buttonStyle(.plain)
+                    Image(systemName: "backward.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .buttonStyle(.plain)
 
                 Button(action: { player.isPlaying ? player.pause() : player.play() }) {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 24)).foregroundColor(.white)
-                }.buttonStyle(.plain)
+                        .font(.system(size: 30))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(.plain)
 
                 Button(action: { player.playNext() }) {
-                    Image(systemName: "forward.fill").font(.system(size: 16)).foregroundColor(.white.opacity(0.8))
-                }.buttonStyle(.plain)
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.top, 8)
-            .padding(.bottom, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
         }
         .frame(width: width, height: height)
         .background(Color.black)
-        .clipShape(ExpandedNotchShape())
+        .clipShape(ExpandedBarShape())
     }
 
     // MARK: - Helpers
@@ -170,12 +195,12 @@ struct NotchPlayerView: View {
     }
 }
 
-// MARK: - Notch Shape (matches hardware notch: flat top, rounded bottom)
+// MARK: - Notch Bar Shape (flat top, rounded bottom corners)
 
-struct NotchShape: Shape {
+struct NotchBarShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let r: CGFloat = 10
+        let r: CGFloat = 12
 
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
@@ -190,22 +215,21 @@ struct NotchShape: Shape {
     }
 }
 
-// MARK: - Expanded Notch Shape (wider, rounder bottom)
+// MARK: - Expanded Bar Shape (wider, bigger bottom radius)
 
-struct ExpandedNotchShape: Shape {
+struct ExpandedBarShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let topR: CGFloat = 4
-        let botR: CGFloat = 18
+        let r: CGFloat = 20
 
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - botR))
-        path.addArc(center: CGPoint(x: rect.maxX - botR, y: rect.maxY - botR),
-                    radius: botR, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
-        path.addLine(to: CGPoint(x: rect.minX + botR, y: rect.maxY))
-        path.addArc(center: CGPoint(x: rect.minX + botR, y: rect.maxY - botR),
-                    radius: botR, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r),
+                    radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r),
+                    radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
         path.closeSubpath()
         return path
     }
@@ -217,20 +241,20 @@ struct EqualizerView: View {
     @State private var animating = false
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(0..<3, id: \.self) { i in
+        HStack(spacing: 2.5) {
+            ForEach(0..<4, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 1)
                     .fill(Color.white)
-                    .frame(width: 2.5, height: animating ? CGFloat.random(in: 4...12) : 3)
+                    .frame(width: 3, height: animating ? CGFloat.random(in: 5...14) : 4)
                     .animation(
                         .easeInOut(duration: 0.35)
                         .repeatForever(autoreverses: true)
-                        .delay(Double(i) * 0.1),
+                        .delay(Double(i) * 0.08),
                         value: animating
                     )
             }
         }
-        .frame(height: 14)
+        .frame(height: 16)
         .onAppear { animating = true }
     }
 }
