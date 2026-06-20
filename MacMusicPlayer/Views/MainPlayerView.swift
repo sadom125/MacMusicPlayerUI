@@ -106,6 +106,14 @@ struct MainPlayerView: View {
         .onAppear {
             loadLyrics()
             startMouseTracking()
+            // Listen for async metadata completion to reload lyrics
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("CurrentTrackMetadataUpdated"),
+                object: nil,
+                queue: .main
+            ) { _ in
+                self.loadLyrics()
+            }
         }
         .onDisappear {
             stopMouseTracking()

@@ -583,6 +583,8 @@ class PlayerManager: NSObject, ObservableObject {
                 if isPlaying {
                     updateNowPlayingInfo()
                 }
+                // Notify views to reload lyrics/artwork now that metadata is available
+                NotificationCenter.default.post(name: NSNotification.Name("CurrentTrackMetadataUpdated"), object: nil)
             }
         }
     }
