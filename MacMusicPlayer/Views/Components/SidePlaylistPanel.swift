@@ -375,13 +375,13 @@ class PlaybackHistory: ObservableObject {
         UserDefaults.standard.removeObject(forKey: dailyCountsKey)
     }
 
-    /// 获取最近 35 天每天的听歌量（用于热力图）
-    func dailyCountsForLast35Days() -> [(date: Date, count: Int)] {
+    /// 获取最近 30 天每天的听歌量（用于热力图）
+    func dailyCountsForLast30Days() -> [(date: Date, count: Int)] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         var result: [(date: Date, count: Int)] = []
 
-        for dayOffset in (0..<35).reversed() {
+        for dayOffset in (0..<30).reversed() {
             if let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) {
                 let key = Self.dateFormatter.string(from: date)
                 let count = dailyPlayCounts[key] ?? 0

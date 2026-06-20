@@ -24,7 +24,7 @@ struct ListeningHeatmap: View {
 
     /// 30 天数据，每行 10 列，共 3 行
     private var rows: [[(date: Date, count: Int)]] {
-        let data = Array(history.dailyCountsForLast35Days().prefix(30))
+        let data = history.dailyCountsForLast30Days()
         let cols = 10
         return stride(from: 0, to: data.count, by: cols).map {
             Array(data[$0..<min($0 + cols, data.count)])
