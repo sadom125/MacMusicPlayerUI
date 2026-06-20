@@ -3,7 +3,6 @@ import AppKit
 
 /// Panel that exactly covers the MacBook notch — click to expand.
 class NotchPlayerWindow: NSPanel {
-    private let hostingView: NSHostingView<AnyView>
     private var expandedState = false
     private weak var playerManager: PlayerManager?
 
@@ -12,10 +11,6 @@ class NotchPlayerWindow: NSPanel {
 
     init(playerManager: PlayerManager) {
         self.playerManager = playerManager
-
-        let contentView = NotchPlayerView(player: playerManager, isExpanded: .constant(false))
-        let hosting = NSHostingView(rootView: AnyView(contentView))
-        self.hostingView = hosting
 
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 220, height: 34),
@@ -28,11 +23,13 @@ class NotchPlayerWindow: NSPanel {
             get: { [weak self] in self?.expandedState ?? false },
             set: { [weak self] value in
                 self?.expandedState = value
-                self?.refreshView()
                 self?.updateLayout(expanded: value)
             }
         )
-        hostingView.rootView = AnyView(NotchPlayerView(player: playerManager, isExpanded: binding))
+
+        let hosting = NSHostingView(rootView: AnyView(
+            NotchPlayerView(player: playerManager, isExpanded: binding)
+        ))
 
         self.isFloatingPanel = true
         self.isOpaque = false
@@ -53,37 +50,24 @@ class NotchPlayerWindow: NSPanel {
 
         self.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)
 
-        self.contentView = hostingView
+        self.contentView = hosting
 
         positionAtNotch()
-    }
-
-    private func refreshView() {
-        guard let pm = playerManager else { return }
-        let binding = Binding<Bool>(
-            get: { [weak self] in self?.expandedState ?? false },
-            set: { [weak self] value in
-                self?.expandedState = value
-                self?.refreshView()
-                self?.updateLayout(expanded: value)
-            }
-        )
-        hostingView.rootView = AnyView(NotchPlayerView(player: pm, isExpanded: binding))
     }
 
     private func updateLayout(expanded: Bool) {
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.frame
 
-        let windowWidth: CGFloat = expanded ? 420 : 220
-        let windowHeight: CGFloat = expanded ? 200 : 34
+        let windowWidth: CGFloat = expanded ? 320 : 220
+        let windowHeight: CGFloat = expanded ? 155 : 34
 
         let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.35
-            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             self.animator().setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
         }
     }
@@ -97,10 +81,8 @@ class NotchPlayerWindow: NSPanel {
     }
 
     func toggleExpanded() {
-        let newState = !expandedState
-        expandedState = newState
-        refreshView()
-        updateLayout(expanded: newState)
+        expandedState = !expandedState
+        updateLayout(expanded: expandedState)
     }
 
     override func close() {
