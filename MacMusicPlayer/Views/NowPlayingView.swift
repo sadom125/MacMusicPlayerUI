@@ -9,12 +9,13 @@ struct NowPlayingView: View {
 
     @ObservedObject var themeManager = ThemeManager.shared
     @State private var rotationAngle: Double = 0
+    @State private var rotationTimer: Timer?
 
     private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.3) : Color.black.opacity(0.3) }
     private var placeholderBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.1) : Color.black.opacity(0.08) }
 
     var body: some View {
-        HStack(spacing: 40) {
+        HStack(spacing: 24) {
             // Left: Vinyl Record
             vinylSection
 
@@ -23,6 +24,9 @@ struct NowPlayingView: View {
         }
         .padding(.horizontal, 60)
         .padding(.vertical, 40)
+        .onAppear { updateRotation() }
+        .onChange(of: isPlaying) { _ in updateRotation() }
+        .onDisappear { stopRotation() }
     }
 
     // MARK: - Vinyl Record
@@ -51,10 +55,6 @@ struct NowPlayingView: View {
                     .frame(width: 180, height: 180)
                     .clipShape(Circle())
                     .rotationEffect(.degrees(rotationAngle))
-                    .onAppear { startRotation() }
-                    .onChange(of: isPlaying) { playing in
-                        if playing { startRotation() } else { stopRotation() }
-                    }
             } else {
                 // Placeholder
                 Circle()
@@ -79,17 +79,27 @@ struct NowPlayingView: View {
         }
     }
 
+    // MARK: - Rotation Control
+
+    private func updateRotation() {
+        if isPlaying {
+            startRotation()
+        } else {
+            stopRotation()
+        }
+    }
+
     private func startRotation() {
-        guard isPlaying else { return }
-        withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
-            rotationAngle = 360
+        rotationTimer?.invalidate()
+        // 8 seconds per full rotation, ~0.05° per frame at 60fps
+        rotationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
+            rotationAngle += 360.0 / (8.0 * 60.0)  // 0.75° per tick
         }
     }
 
     private func stopRotation() {
-        withAnimation(.easeOut(duration: 0.5)) {
-            rotationAngle = 0
-        }
+        rotationTimer?.invalidate()
+        rotationTimer = nil
     }
 
     private var lyricsSection: some View {
