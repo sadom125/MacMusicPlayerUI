@@ -19,8 +19,8 @@ struct NotchPlayerView: View {
                 collapsedContent(width: geo.size.width, height: geo.size.height)
             }
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isExpanded)
-        .contentShape(Rectangle()) // Make entire area tappable
+        .animation(.spring(response: 0.5, dampingFraction: 0.75, blendDuration: 0), value: isExpanded)
+        .contentShape(Rectangle())
         .onTapGesture {
             if let panel = NSApp.windows.first(where: { $0 is NotchPlayerWindow }) as? NotchPlayerWindow {
                 panel.toggleExpanded()
@@ -28,7 +28,7 @@ struct NotchPlayerView: View {
         }
     }
 
-    // MARK: - Collapsed: flat top, rounded bottom, just equalizer
+    // MARK: - Collapsed
 
     private func collapsedContent(width: CGFloat, height: CGFloat) -> some View {
         HStack {
@@ -41,13 +41,13 @@ struct NotchPlayerView: View {
             NotchBarShape()
                 .fill(Color.black)
         )
+        .drawingGroup()
     }
 
     // MARK: - Expanded
 
     private func expandedContent(width: CGFloat, height: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Album art + info
             HStack(spacing: 14) {
                 if let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
@@ -79,14 +79,11 @@ struct NotchPlayerView: View {
 
                 Spacer()
 
-                if player.isPlaying {
-                    EqualizerView()
-                }
+                EqualizerView()
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
 
-            // Progress bar
             VStack(spacing: 5) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -113,7 +110,6 @@ struct NotchPlayerView: View {
             .padding(.horizontal, 20)
             .padding(.top, 14)
 
-            // Controls
             HStack(spacing: 40) {
                 Button(action: { player.playPrevious() }) {
                     Image(systemName: "backward.fill")
@@ -144,6 +140,7 @@ struct NotchPlayerView: View {
             NotchExpandedBg(radius: 22)
                 .fill(Color.black)
         )
+        .drawingGroup()
     }
 
     // MARK: - Helpers
@@ -162,24 +159,23 @@ struct NotchPlayerView: View {
 // MARK: - Equalizer Animation
 
 struct EqualizerView: View {
-    @State private var animating = false
+    @State private var bars: [CGFloat] = [4, 4, 4, 4]
+    private let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 2.5) {
             ForEach(0..<4, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 1)
                     .fill(Color.white)
-                    .frame(width: 3, height: animating ? CGFloat.random(in: 5...14) : 4)
-                    .animation(
-                        .easeInOut(duration: 0.35)
-                        .repeatForever(autoreverses: true)
-                        .delay(Double(i) * 0.08),
-                        value: animating
-                    )
+                    .frame(width: 3, height: bars[i])
             }
         }
         .frame(height: 16)
-        .onAppear { animating = true }
+        .onReceive(timer) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                bars = (0..<4).map { _ in CGFloat.random(in: 4...14) }
+            }
+        }
     }
 }
 
@@ -190,18 +186,12 @@ struct NotchBarShape: Shape {
         var path = Path()
         let r: CGFloat = 10
 
-        // Start top-left, go clockwise
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        // Top edge (flat)
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        // Right edge down
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
-        // Bottom-right corner (arc going down-left)
         path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r),
                     radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
-        // Bottom edge left
         path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
-        // Bottom-left corner (arc going up-left)
         path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r),
                     radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
         path.closeSubpath()
