@@ -21,6 +21,9 @@ struct HomeView: View {
                 // Library Stats
                 statsSection
 
+                // Listening Heatmap
+                ListeningHeatmap()
+
                 // Recent Tracks
                 recentTracksSection
 

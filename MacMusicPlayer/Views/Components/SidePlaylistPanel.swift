@@ -333,8 +333,11 @@ class PlaybackHistory: ObservableObject {
 
     private let maxHistorySize = 50
     private let historyKey = "PlaybackHistory"
+    private let dailyCountsKey = "PlaybackDailyCounts"
 
     @Published var recentTracks: [Track] = []
+    /// 日听歌量：[日期字符串: 次数]
+    @Published var dailyPlayCounts: [String: Int] = [:]
 
     private init() {
         loadFromStorage()
@@ -352,23 +355,53 @@ class PlaybackHistory: ObservableObject {
             recentTracks = Array(recentTracks.prefix(maxHistorySize))
         }
 
+        // Update daily count
+        let today = Self.dateFormatter.string(from: Date())
+        dailyPlayCounts[today, default: 0] += 1
+
         saveToStorage()
     }
 
     func clear() {
         recentTracks = []
+        dailyPlayCounts = [:]
         UserDefaults.standard.removeObject(forKey: historyKey)
+        UserDefaults.standard.removeObject(forKey: dailyCountsKey)
     }
 
+    /// 获取最近 35 天每天的听歌量（用于热力图）
+    func dailyCountsForLast35Days() -> [(date: Date, count: Int)] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var result: [(date: Date, count: Int)] = []
+
+        for dayOffset in (0..<35).reversed() {
+            if let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) {
+                let key = Self.dateFormatter.string(from: date)
+                let count = dailyPlayCounts[key] ?? 0
+                result.append((date: date, count: count))
+            }
+        }
+        return result
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     private func saveToStorage() {
-        // Save track URLs as history
         let urls = recentTracks.map { $0.url.path }
         UserDefaults.standard.set(urls, forKey: historyKey)
+        UserDefaults.standard.set(dailyPlayCounts, forKey: dailyCountsKey)
     }
 
     private func loadFromStorage() {
         guard let urls = UserDefaults.standard.stringArray(forKey: historyKey) else { return }
-        // History is kept in memory during app session
+        if let counts = UserDefaults.standard.dictionary(forKey: dailyCountsKey) as? [String: Int] {
+            dailyPlayCounts = counts
+        }
     }
 }
 
