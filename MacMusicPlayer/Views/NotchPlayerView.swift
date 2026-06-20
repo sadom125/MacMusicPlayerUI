@@ -192,18 +192,20 @@ struct NotchBarShape: Shape {
         var path = Path()
         let r: CGFloat = 10
 
-        // Flat top
+        // Start top-left, go clockwise
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        // Top edge (flat)
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        // Right side down to bottom-right corner
+        // Right edge down
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        // Bottom-right corner (arc going down-left)
         path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r),
-                    radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
-        // Bottom
+                    radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        // Bottom edge left
         path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        // Bottom-left corner (arc going up-left)
         path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r),
-                    radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
-        // Left side up
+                    radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
         path.closeSubpath()
         return path
     }
@@ -220,10 +222,10 @@ struct NotchExpandedBg: Shape {
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
         path.addArc(center: CGPoint(x: rect.maxX - radius, y: rect.maxY - radius),
-                    radius: radius, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
+                    radius: radius, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
         path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
         path.addArc(center: CGPoint(x: rect.minX + radius, y: rect.maxY - radius),
-                    radius: radius, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
+                    radius: radius, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
         path.closeSubpath()
         return path
     }
