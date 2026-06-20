@@ -250,12 +250,20 @@ class MainPlayerWindow: NSWindow {
         NotificationCenter.default.removeObserver(self)
     }
 
-    /// Force glass view to re-render when app reactivates — fixes black flash.
+    /// Force glass view to re-render when app reactivates — fixes black/white flash.
     @objc private func appDidBecomeActive() {
-        // Force immediate synchronous redraw instead of deferred
-        glassView?.displayIfNeeded()
-        hostingView.displayIfNeeded()
-        self.displayIfNeeded()
+        guard let glass = glassView else { return }
+
+        // Force NSVisualEffectView to rebuild its rendering context
+        // by toggling its state. This triggers a full re-render of the glass material.
+        glass.state = .inactive
+        glass.needsDisplay = true
+
+        DispatchQueue.main.async {
+            glass.state = .active
+            glass.needsDisplay = true
+            self.displayIfNeeded()
+        }
     }
 
     /// Update the SwiftUI content without replacing the hosting view (preserves glass background).
