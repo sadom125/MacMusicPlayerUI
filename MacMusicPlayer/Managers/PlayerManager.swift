@@ -121,6 +121,11 @@ class PlayerManager: NSObject, ObservableObject {
                 self.duration = 0
             }
 
+            // Add to playback history
+            if let track = track {
+                PlaybackHistory.shared.addToHistory(track)
+            }
+
             self.updateNowPlayingInfo()
         }
 
@@ -249,9 +254,13 @@ class PlayerManager: NSObject, ObservableObject {
                 var title = fileName
                 var artist = NSLocalizedString("Unknown Artist", comment: "Default artist name when parsing filenames")
 
+                // Support both "歌名 - 歌手" and "歌名-歌手" formats
                 if let range = fileName.range(of: " - ") {
-                    artist = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
-                    title = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    title = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                    artist = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                } else if let range = fileName.range(of: "-") {
+                    title = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                    artist = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
                 }
 
                 let track = Track(

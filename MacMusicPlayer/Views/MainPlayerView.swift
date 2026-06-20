@@ -1,67 +1,18 @@
 import SwiftUI
 
-/// Main player view assembling all components as per the design mockup.
-/// Layout:
-///   - Top: (empty — cover is background)
-///   - Center: LyricsView
-///   - Bottom: Control bar + PlaylistPanel (collapsible, auto-hides during playback)
+/// Main player view assembling all components.
+/// Supports two modes: Home overview and Now Playing.
 struct MainPlayerView: View {
     @ObservedObject var player: PlayerManager
     @ObservedObject var themeManager = ThemeManager.shared
     @State private var lyrics: [LyricLine] = []
-    /// Cached last-found index — avoids scanning from 0 on every 100ms tick.
-    /// Use -1 to mean "before the first lyric line" (no line active).
     @State private var lastLyricIndex: Int = -1
-
-    /// Updated from player.currentTime via .onChange — only recomputes when time changes.
-    private func updateLyricIndex(time: TimeInterval) {
-        guard !lyrics.isEmpty else {
-            if lastLyricIndex != -1 { lastLyricIndex = -1 }
-            return
-        }
-        // Common case: time advanced forward → scan from last index.
-        // If time went backward (seek) → scan from beginning.
-        let startIdx = (time > (lastLyricIndex >= 0 ? lyrics[lastLyricIndex].time : -1))
-            ? lastLyricIndex >= 0 ? lastLyricIndex : 0
-            : 0
-
-        var idx = -1
-        for i in startIdx..<lyrics.count {
-            if lyrics[i].time <= time { idx = i } else { break }
-        }
-        // If we started from 0 and didn't find anything, idx stays -1.
-        if idx == -1 && startIdx > 0 {
-            // Time went backward — scan from 0
-            for i in 0..<min(startIdx, lyrics.count) {
-                if lyrics[i].time <= time { idx = i } else { break }
-            }
-        }
-        if idx != lastLyricIndex {
-            lastLyricIndex = idx
-        }
-    }
     @State private var artworkFallbackCache: [UUID: Data?] = [:]
     @AppStorage("bgMode") private var bgMode: String = "albumArt"
-    @AppStorage("windowOpacity") private var windowOpacity: Double = 1.0
     @AppStorage("showPlaylist") private var showPlaylist: Bool = false
-    @AppStorage("playlistPosition") private var playlistPosition: String = "right" // "right" or "bottom"
-    @State private var showBgPicker: Bool = false
-    @State private var showPlaylistMenu: Bool = false
-    @State private var volume: Float = 0.3
+    @AppStorage("viewMode") private var viewMode: String = "nowPlaying"
 
-    /// Background mode options
-    private let bgOptions: [(id: String, label: String, color: Color?)] = [
-        ("none", "无背景", nil),
-        ("albumArt", "专辑封面", nil),
-        ("solid:#08080e", "深黑", Color(red: 0.031, green: 0.031, blue: 0.055)),
-        ("solid:#0e1628", "深蓝", Color(red: 0.055, green: 0.086, blue: 0.157)),
-        ("solid:#1a0e28", "深紫", Color(red: 0.102, green: 0.055, blue: 0.157)),
-        ("solid:#1e1e1e", "深灰", Color(red: 0.118, green: 0.118, blue: 0.118)),
-        ("solid:#0a1a1a", "青绿", Color(red: 0.039, green: 0.102, blue: 0.102)),
-    ]
-
-    // MARK: - Auto-hide controls
-
+    // Auto-hide controls
     @State private var controlsVisible: Bool = true
     @State private var lastMouseActivity: Date = Date()
     @State private var mouseMonitor: Any? = nil
@@ -69,106 +20,89 @@ struct MainPlayerView: View {
     private let idleThreshold: TimeInterval = 3.0
     private let idleCheckInterval: TimeInterval = 0.5
 
-    /// Artwork from Track model, falling back to synchronous FLAC scan (cached per track).
+    // Window height for full-size playlist panel
+    @State private var windowHeight: CGFloat = 750
+
+    /// Artwork from Track model, falling back to synchronous FLAC scan.
     private var currentArtworkData: Data? {
         guard let track = player.currentTrack else { return nil }
-        // Always prefer async metadata — this is the real source of truth
         if let data = track.albumArtData { return data }
-        // Fallback: synchronous FLAC scan, cached per track to avoid repeated I/O
         if let cached = artworkFallbackCache[track.id] { return cached }
         let data = MetadataParser.parseArtworkDirect(from: track.url)
         artworkFallbackCache[track.id] = data
-        NSLog("[Artwork] FLAC scan result: %d bytes", data?.count ?? 0)
         return data
     }
 
-    /// Resolve solid background color from bgMode string
-    private var solidBgColor: Color? {
-        guard bgMode.hasPrefix("solid:") else { return nil }
-        let hex = String(bgMode.dropFirst("solid:".count))
-        return Color(hex: hex)
-    }
-
     var body: some View {
-        Group {
-            if playlistPosition == "right" {
-                // Right side playlist layout
-                HStack(spacing: 0) {
-                    // === Main Content: Lyrics + Controls ===
-                    ZStack(alignment: .bottom) {
-                        // Lyrics fill entire area
-                        LyricsView(lyrics: lyrics, currentLineIndex: lastLyricIndex)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                // Window-level glass background
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea()
 
-                        // Floating Bottom Controls (overlay)
-                        controlBar
-                            .padding(.horizontal, 32)
-                            .padding(.bottom, 8)
-                            .offset(y: controlsVisible ? 0 : 80)
-                            .opacity(controlsVisible ? 1 : 0)
-                            .animation(.easeOut(duration: 0.5), value: controlsVisible)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Dynamic gradient overlay based on album art
+                AlbumArtBackground(
+                    artworkData: bgMode == "none" ? nil : currentArtworkData,
+                    trackID: player.currentTrack?.id,
+                    isAnimating: player.isPlaying,
+                    solidColor: solidBgColor
+                )
+                .ignoresSafeArea()
 
-                    // === Playlist Panel (right side) ===
-                    if showPlaylist {
-                        PlaylistPanel(
-                            tracks: player.playlist,
-                            currentTrackID: player.currentTrack?.id,
-                            onTrackTap: { index in
-                                player.playTrack(at: index)
+                // Main Content (with bottom padding for control bar)
+                mainContent
+                    .padding(.bottom, 120)
+
+                // Control Bar (centered at bottom, overlapping content)
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        CompactControlBar(
+                            player: player,
+                            isVisible: $controlsVisible,
+                            onMiniPlayerToggle: { switchToMiniPlayer() },
+                            onPlaylistToggle: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                    showPlaylist.toggle()
+                                }
                             }
                         )
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                        .ignoresSafeArea(.container, edges: .top)
+                        Spacer()
                     }
                 }
-                .animation(.easeInOut(duration: 0.25), value: showPlaylist)
-            } else {
-                // Bottom playlist layout
-                VStack(spacing: 0) {
-                    // === Main Content: Lyrics + Controls ===
-                    ZStack(alignment: .bottom) {
-                        // Lyrics fill entire area
-                        LyricsView(lyrics: lyrics, currentLineIndex: lastLyricIndex)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        // Floating Bottom Controls (overlay)
-                        controlBar
-                            .padding(.horizontal, 32)
-                            .padding(.bottom, 8)
-                            .offset(y: controlsVisible ? 0 : 80)
-                            .opacity(controlsVisible ? 1 : 0)
-                            .animation(.easeOut(duration: 0.5), value: controlsVisible)
+                // View Mode Selector (left side, vertically centered)
+                viewModeSelector
+            }
+            .overlay(alignment: .trailing) {
+                // Playlist Panel — floating card with padding, rounded corners
+                SidePlaylistPanel(
+                    tracks: player.playlist,
+                    currentTrackID: player.currentTrack?.id,
+                    onTrackTap: { index in
+                        player.playTrack(at: index)
+                    },
+                    onDismiss: {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                            showPlaylist = false
+                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    // === Playlist Panel (bottom) ===
-                    if showPlaylist {
-                        PlaylistPanel(
-                            tracks: player.playlist,
-                            currentTrackID: player.currentTrack?.id,
-                            onTrackTap: { index in
-                                player.playTrack(at: index)
-                            },
-                            isHorizontal: true
-                        )
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .ignoresSafeArea(.container, edges: .bottom)
-                    }
-                }
-                .animation(.easeInOut(duration: 0.25), value: showPlaylist)
+                )
+                .frame(width: 300)
+                .padding(.vertical, 20)
+                .shadow(color: .black.opacity(0.25), radius: 20, x: -5, y: 0)
+                .offset(x: showPlaylist ? 0 : 340)
+                .animation(.spring(response: 0.45, dampingFraction: 0.82), value: showPlaylist)
+            }
+            .onAppear {
+                windowHeight = geo.size.height
+            }
+            .onChange(of: geo.size) { newSize in
+                windowHeight = newSize.height
             }
         }
-        .background(
-            AlbumArtBackground(
-                artworkData: bgMode == "none" ? nil : currentArtworkData,
-                trackID: player.currentTrack?.id,
-                isAnimating: player.isPlaying,
-                solidColor: solidBgColor
-            )
-            .ignoresSafeArea()
-        )
         .onAppear {
             loadLyrics()
             startMouseTracking()
@@ -187,18 +121,153 @@ struct MainPlayerView: View {
         }
     }
 
-    // MARK: - Control Glow
+    // MARK: - Main Content
+
+    @ViewBuilder
+    private var mainContent: some View {
+        if viewMode == "home" {
+            HomeView(player: player)
+        } else {
+            NowPlayingView(
+                artworkData: currentArtworkData,
+                lyrics: lyrics,
+                currentLineIndex: lastLyricIndex
+            )
+        }
+    }
+
+    // MARK: - View Mode Selector
+
+    private var viewModeSelector: some View {
+        let inactiveIconColor: Color = themeManager.isDarkMode ? Color.white.opacity(0.5) : Color.black.opacity(0.5)
+        let inactiveBg: Color = themeManager.isDarkMode ? Color.white.opacity(0.05) : Color.black.opacity(0.05)
+
+        return VStack(spacing: 16) {
+            Button(action: { viewMode = "home" }) {
+                Image(systemName: "house.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(viewMode == "home" ? themeManager.accent : inactiveIconColor)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        viewMode == "home"
+                            ? themeManager.accent.opacity(0.15)
+                            : inactiveBg
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+
+            Button(action: { viewMode = "nowPlaying" }) {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(viewMode == "nowPlaying" ? themeManager.accent : inactiveIconColor)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        viewMode == "nowPlaying"
+                            ? themeManager.accent.opacity(0.15)
+                            : inactiveBg
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.leading, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private var solidBgColor: Color? {
+        guard bgMode.hasPrefix("solid:") else { return nil }
+        let hex = String(bgMode.dropFirst("solid:".count))
+        return Color(hex: hex)
+    }
+
+    // MARK: - Lyrics Loading
+
+    private func loadLyrics() {
+        guard let track = player.currentTrack else {
+            lyrics = []
+            return
+        }
+
+        // 1. Try external .lrc file
+        let lrcURL = track.url.deletingPathExtension().appendingPathExtension("lrc")
+        if let lrcText = try? String(contentsOf: lrcURL, encoding: .utf8) {
+            let parsed = LrcParser.parse(lrcText: lrcText)
+            if !parsed.isEmpty {
+                lyrics = parsed
+                updateLyricIndex(time: player.currentTime)
+                return
+            }
+        }
+
+        // 2. Try embedded lyrics
+        if let lrcText = track.lyrics, !lrcText.isEmpty {
+            let parsed = LrcParser.parse(lrcText: lrcText)
+            if !parsed.isEmpty {
+                lyrics = parsed
+                updateLyricIndex(time: player.currentTime)
+                return
+            }
+        }
+
+        // 2b. Direct synchronous scan
+        if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
+            let parsed = LrcParser.parse(lrcText: lrcText)
+            if !parsed.isEmpty {
+                lyrics = parsed
+                updateLyricIndex(time: player.currentTime)
+                return
+            }
+        }
+
+        // 3. Fallback: show track info
+        var fallbackLines: [LyricLine] = []
+        fallbackLines.append(LyricLine(time: 0, text: track.title))
+        if !track.artist.isEmpty, track.artist != NSLocalizedString("Unknown Artist", comment: "") {
+            fallbackLines.append(LyricLine(time: 0, text: track.artist))
+        }
+        if !track.album.isEmpty, track.album != NSLocalizedString("Unknown Album", comment: "") {
+            fallbackLines.append(LyricLine(time: 0, text: track.album))
+        }
+        if fallbackLines.isEmpty {
+            fallbackLines.append(LyricLine(time: 0, text: track.title))
+        }
+        lyrics = fallbackLines
+        updateLyricIndex(time: player.currentTime)
+    }
+
+    private func updateLyricIndex(time: TimeInterval) {
+        guard !lyrics.isEmpty else {
+            if lastLyricIndex != -1 { lastLyricIndex = -1 }
+            return
+        }
+        let startIdx = (time > (lastLyricIndex >= 0 ? lyrics[lastLyricIndex].time : -1))
+            ? lastLyricIndex >= 0 ? lastLyricIndex : 0
+            : 0
+
+        var idx = -1
+        for i in startIdx..<lyrics.count {
+            if lyrics[i].time <= time { idx = i } else { break }
+        }
+        if idx == -1 && startIdx > 0 {
+            for i in 0..<min(startIdx, lyrics.count) {
+                if lyrics[i].time <= time { idx = i } else { break }
+            }
+        }
+        if idx != lastLyricIndex {
+            lastLyricIndex = idx
+        }
+    }
+
     // MARK: - Mouse Tracking
 
     private func startMouseTracking() {
-        // Monitor mouse movement anywhere in the window
         let monitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]) { event in
             self.onMouseActivity()
             return event
         }
         mouseMonitor = monitor
 
-        // Periodic timer to check idle timeout
         idleTimer = Timer.scheduledTimer(withTimeInterval: idleCheckInterval, repeats: true) { _ in
             let idle = Date().timeIntervalSince(self.lastMouseActivity)
             let shouldHide = self.player.isPlaying && idle > self.idleThreshold
@@ -228,18 +297,16 @@ struct MainPlayerView: View {
         }
     }
 
-    /// Switch to mini player with smooth animation
+    // MARK: - Mini Player Switch
+
     private func switchToMiniPlayer() {
         guard let fullWindow = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) else { return }
 
-        // Save zoomed state before switching
         UserDefaults.standard.set(fullWindow.isZoomed, forKey: "wasZoomedBeforeMini")
 
-        // If window is maximized (zoomed), restore to normal size first
         if fullWindow.isZoomed {
             fullWindow.zoom(nil)
-            // Wait for zoom animation to finish before continuing
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 self.performMiniPlayerSwitch(fullWindow: fullWindow)
             }
         } else {
@@ -250,464 +317,32 @@ struct MainPlayerView: View {
     private func performMiniPlayerSwitch(fullWindow: NSWindow) {
         let sourceFrame = fullWindow.frame
 
-        // Close any existing mini player window first (safety)
         if let existingMini = (NSApplication.shared.delegate as? AppDelegate)?.miniPlayerWindow {
             existingMini.close()
         }
 
-        // Create mini player without showing it yet
         let miniWindow = MiniPlayerWindow.show(playerManager: player, showWindow: false)
         (NSApplication.shared.delegate as? AppDelegate)?.miniPlayerWindow = miniWindow
         miniWindow.delegate = NSApplication.shared.delegate as? NSWindowDelegate
 
-        // Target is the top-right position set by MiniPlayerWindow.show
         let targetFrame = miniWindow.frame
 
-        // Start at full window position, invisible
         miniWindow.setFrame(sourceFrame, display: false)
         miniWindow.alphaValue = 0.0
 
-        // Hide full window first, then animate mini in
         fullWindow.orderOut(nil)
 
         miniWindow.orderFront(nil)
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.35
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.duration = 0.45
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             ctx.allowsImplicitAnimation = true
 
             miniWindow.animator().setFrame(targetFrame, display: true)
             miniWindow.animator().alphaValue = 1.0
         }
     }
-
-    // MARK: - Control Bar
-
-    private var controlBar: some View {
-        VStack(spacing: 8) {
-            // Top row: Progress slider with glass background
-            ProgressSlider(
-                currentTime: Binding(
-                    get: { player.currentTime },
-                    set: { player.currentTime = $0 }
-                ),
-                duration: player.duration,
-                onSeek: { time in player.seek(to: time) }
-            )
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.4)
-            )
-
-            // Bottom row: Controls (evenly distributed)
-            HStack(spacing: 0) {
-                // Playback controls
-                HStack(spacing: 16) {
-                    controlButton(icon: "backward.fill", size: 16) { player.playPrevious() }
-                    playPauseButton
-                    controlButton(icon: "forward.fill", size: 16) { player.playNext() }
-                }
-
-                Spacer()
-
-                // Play mode toggle
-                playModeButton
-
-                Spacer()
-
-                // Background mode picker
-                Button(action: { showBgPicker.toggle() }) {
-                    Image(systemName: bgMode == "none" ? "square.dashed" : "photo")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(bgMode == "none" ? .white.opacity(0.5) : themeManager.accent)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            bgMode == "none"
-                                ? Color.white.opacity(0.04)
-                                : themeManager.accent.opacity(0.08)
-                        )
-                        .cornerRadius(8)
-                }
-                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
-                .popover(isPresented: $showBgPicker, arrowEdge: .top) {
-                    VStack(spacing: 0) {
-                        ForEach(bgOptions, id: \.id) { option in
-                            Button(action: {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    bgMode = option.id
-                                }
-                                showBgPicker = false
-                            }) {
-                                HStack(spacing: 8) {
-                                    if let color = option.color {
-                                        Circle().fill(color).frame(width: 12, height: 12)
-                                            .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
-                                    } else if option.id == "none" {
-                                        Image(systemName: "square.dashed").font(.system(size: 11))
-                                    } else {
-                                        Image(systemName: "photo").font(.system(size: 11))
-                                    }
-                                    Text(option.label)
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.8))
-                                    Spacer()
-                                    if bgMode == option.id {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundColor(themeManager.accent)
-                                    }
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            if option.id != bgOptions.last?.id {
-                                Divider().padding(.horizontal, 12)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 6)
-                    .frame(width: 160)
-                }
-
-                Spacer()
-
-                // Theme toggle
-                Button(action: { themeManager.cycle() }) {
-                    Circle()
-                        .fill(themeManager.accent)
-                        .frame(width: 14, height: 14)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white.opacity(0.04))
-                        )
-                }
-                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
-                .help("Theme: \(themeManager.themeName)")
-
-                Spacer()
-
-                // Volume control (Apple Music style)
-                HStack(spacing: 6) {
-                    Button(action: {
-                        volume = volume > 0 ? 0 : 0.3
-                        player.volume = volume
-                    }) {
-                        Image(systemName: volumeIcon)
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.5))
-                            .frame(width: 20)
-                    }
-                    .buttonStyle(.plain)
-
-                    Slider(value: Binding(
-                        get: { Double(volume) },
-                        set: { volume = Float($0); player.volume = volume }
-                    ), in: 0...1)
-                        .frame(width: 70)
-                        .tint(themeManager.accent)
-                }
-                .frame(height: 34)
-                .onAppear {
-                    volume = player.volume
-                }
-
-                Spacer()
-
-                // Window opacity slider
-                HStack(spacing: 4) {
-                    Image(systemName: "circle.lefthalf.filled")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.4))
-                    Slider(value: $windowOpacity, in: 0.3...1.0)
-                        .frame(width: 50)
-                        .tint(themeManager.accent)
-                }
-                .frame(height: 34)
-                .onChange(of: windowOpacity) { newValue in
-                    if let win = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }) {
-                        win.alphaValue = CGFloat(newValue)
-                    }
-                }
-
-                Spacer()
-
-                // Playlist toggle with dropdown
-                Button(action: {
-                    showPlaylistMenu = true
-                }) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(showPlaylist ? themeManager.accent : .white.opacity(0.5))
-                        .frame(width: 34, height: 34)
-                        .background(
-                            showPlaylist
-                                ? themeManager.accent.opacity(0.08)
-                                : Color.white.opacity(0.04)
-                        )
-                        .cornerRadius(8)
-                }
-                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
-                .popover(isPresented: $showPlaylistMenu, arrowEdge: .top) {
-                    VStack(spacing: 4) {
-                        // Toggle playlist visibility
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                showPlaylist.toggle()
-                            }
-                            if let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }), !window.isZoomed {
-                                let targetWidth: CGFloat = playlistPosition == "right" ? (showPlaylist ? 1180 : 900) : 900
-                                let targetHeight: CGFloat = playlistPosition == "bottom" ? (showPlaylist ? 900 : 650) : 650
-                                var frame = window.frame
-                                frame.size.width = targetWidth
-                                frame.size.height = targetHeight
-                                window.setFrame(frame, display: true, animate: true)
-                            }
-                            showPlaylistMenu = false
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: showPlaylist ? "eye.slash" : "eye")
-                                    .font(.system(size: 12))
-                                Text(showPlaylist ? "隐藏播放列表" : "显示播放列表")
-                                    .font(.system(size: 13))
-                                Spacer()
-                            }
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-
-                        Divider()
-
-                        // Position: Right
-                        Button(action: {
-                            playlistPosition = "right"
-                            if showPlaylist, let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }), !window.isZoomed {
-                                var frame = window.frame
-                                frame.size.width = 1180
-                                frame.size.height = 650
-                                window.setFrame(frame, display: true, animate: true)
-                            }
-                            showPlaylistMenu = false
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "rectangle.split.3x1")
-                                    .font(.system(size: 12))
-                                Text("右侧显示")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                if playlistPosition == "right" {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(themeManager.accent)
-                                }
-                            }
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-
-                        // Position: Bottom
-                        Button(action: {
-                            playlistPosition = "bottom"
-                            if showPlaylist, let window = NSApplication.shared.windows.first(where: { $0 is MainPlayerWindow }), !window.isZoomed {
-                                var frame = window.frame
-                                frame.size.width = 900
-                                frame.size.height = 900
-                                window.setFrame(frame, display: true, animate: true)
-                            }
-                            showPlaylistMenu = false
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "rectangle.split.1x2")
-                                    .font(.system(size: 12))
-                                Text("底部显示")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                if playlistPosition == "bottom" {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(themeManager.accent)
-                                }
-                            }
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.vertical, 8)
-                    .frame(width: 200)
-                }
-
-                Spacer()
-
-                // Mini player toggle
-                Button(action: switchToMiniPlayer) {
-                    Image(systemName: "arrow.down.forward.and.arrow.up.backward")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                        .frame(width: 34, height: 34)
-                        .background(Color.white.opacity(0.04))
-                        .cornerRadius(8)
-                }
-                .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
-                .help("Switch to mini player")
-            }
-            .padding(.horizontal, 20)
-        }
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
-                .opacity(0.5)
-        )
-        .padding(.horizontal, 20)
-        .padding(.bottom, 16)
-    }
-
-    /// Play mode button — cycles sequential → singleLoop → random → sequential
-    private var playModeButton: some View {
-        Button(action: {
-            let modes: [PlayMode] = [.sequential, .singleLoop, .random]
-            let currentIdx = modes.firstIndex(of: player.playMode) ?? 0
-            let next = modes[(currentIdx + 1) % modes.count]
-            player.playMode = next
-        }) {
-            HStack(spacing: 5) {
-                Image(systemName: playModeIcon(player.playMode))
-                    .font(.system(size: 12, weight: .medium))
-                Text(playModeLabel(player.playMode))
-                    .font(.system(size: 10))
-            }
-            .foregroundColor(.white.opacity(0.6))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(8)
-        }
-        .buttonStyle(PressableButtonStyle(scaleDown: 0.9))
-    }
-
-    private func playModeIcon(_ mode: PlayMode) -> String {
-        switch mode {
-        case .sequential: return "repeat"
-        case .singleLoop: return "repeat.1"
-        case .random:     return "shuffle"
-        }
-    }
-
-    private func playModeLabel(_ mode: PlayMode) -> String {
-        switch mode {
-        case .sequential: return "列表循环"
-        case .singleLoop: return "单曲循环"
-        case .random:     return "随机播放"
-        }
-    }
-
-    private var playPauseButton: some View {
-        Button(action: {
-            player.isPlaying ? player.pause() : player.play()
-        }) {
-            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 18))
-                .foregroundColor(themeManager.accent)
-                .frame(width: 48, height: 48)
-                .background(themeManager.accent.opacity(0.1))
-                .clipShape(Circle())
-        }
-        .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
-    }
-
-    private func controlButton(icon: String, size: CGFloat, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: size, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-                .frame(width: 36, height: 36)
-        }
-        .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
-    }
-
-    /// Volume icon based on level (Apple Music style)
-    private var volumeIcon: String {
-        if volume <= 0 {
-            return "speaker.slash.fill"
-        } else if volume < 0.33 {
-            return "speaker.wave.1.fill"
-        } else if volume < 0.66 {
-            return "speaker.wave.2.fill"
-        } else {
-            return "speaker.wave.3.fill"
-        }
-    }
-
-    // MARK: - Lyrics
-
-    private func loadLyrics() {
-        guard let track = player.currentTrack else {
-            lyrics = []
-            return
-        }
-
-        // 1. Try external .lrc file alongside the audio file
-        let lrcURL = track.url.deletingPathExtension().appendingPathExtension("lrc")
-        if let lrcText = try? String(contentsOf: lrcURL, encoding: .utf8) {
-            let parsed = LrcParser.parse(lrcText: lrcText)
-            if !parsed.isEmpty {
-                lyrics = parsed
-                updateLyricIndex(time: player.currentTime)
-                return
-            }
-        }
-
-        // 2. Try embedded lyrics from audio file metadata (e.g. FLAC Vorbis LYRICS tag)
-        if let lrcText = track.lyrics, !lrcText.isEmpty {
-            let parsed = LrcParser.parse(lrcText: lrcText)
-            if !parsed.isEmpty {
-                lyrics = parsed
-                updateLyricIndex(time: player.currentTime)
-                return
-            }
-        }
-
-        // 2b. Direct synchronous scan of raw FLAC Vorbis comments for LYRICS tag
-        if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
-            let parsed = LrcParser.parse(lrcText: lrcText)
-            if !parsed.isEmpty {
-                lyrics = parsed
-                updateLyricIndex(time: player.currentTime)
-                return
-            }
-        }
-
-        // 3. Fallback: show track info
-        var fallbackLines: [LyricLine] = []
-        fallbackLines.append(LyricLine(time: 0, text: track.title))
-        if !track.artist.isEmpty, track.artist != NSLocalizedString("Unknown Artist", comment: "") {
-            fallbackLines.append(LyricLine(time: 0, text: track.artist))
-        }
-        if !track.album.isEmpty, track.album != NSLocalizedString("Unknown Album", comment: "") {
-            fallbackLines.append(LyricLine(time: 0, text: track.album))
-        }
-        if fallbackLines.isEmpty {
-            fallbackLines.append(LyricLine(time: 0, text: track.title))
-        }
-        lyrics = fallbackLines
-        updateLyricIndex(time: player.currentTime)
-    }
-
 }
 
 // MARK: - Color Hex Extension
@@ -719,11 +354,11 @@ extension Color {
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
         switch hex.count {
-        case 3: // RGB (12-bit)
+        case 3:
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
+        case 6:
             (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
+        case 8:
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
         default:
             (a, r, g, b) = (255, 0, 0, 0)
@@ -737,4 +372,3 @@ extension Color {
         )
     }
 }
-

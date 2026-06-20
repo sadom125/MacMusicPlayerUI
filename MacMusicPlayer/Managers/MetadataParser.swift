@@ -40,10 +40,27 @@ struct MetadataParser {
         let validDuration = durationSeconds.isFinite && durationSeconds > 0 ? durationSeconds : 0
 
         // Extract common metadata using commonKey lookup
-        let title = findMetadataItem(metadata: metadata, key: AVMetadataKey.commonKeyTitle)
-            ?? url.deletingPathExtension().lastPathComponent
-        let artist = findMetadataItem(metadata: metadata, key: AVMetadataKey.commonKeyArtist)
-            ?? NSLocalizedString("Unknown Artist", comment: "Default artist name")
+        let rawTitle = findMetadataItem(metadata: metadata, key: AVMetadataKey.commonKeyTitle)
+        let rawArtist = findMetadataItem(metadata: metadata, key: AVMetadataKey.commonKeyArtist)
+
+        // If no embedded metadata, parse from filename: "歌名 - 歌手" or "歌名-歌手"
+        let filename = url.deletingPathExtension().lastPathComponent
+        var title: String
+        var artist: String
+
+        if let t = rawTitle, let a = rawArtist {
+            title = t
+            artist = a
+        } else if let range = filename.range(of: " - ") {
+            title = String(filename[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+            artist = String(filename[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        } else if let range = filename.range(of: "-") {
+            title = String(filename[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+            artist = String(filename[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        } else {
+            title = rawTitle ?? filename
+            artist = rawArtist ?? NSLocalizedString("Unknown Artist", comment: "Default artist name")
+        }
         let album = findMetadataItem(metadata: metadata, key: AVMetadataKey.commonKeyAlbumName)
             ?? NSLocalizedString("Unknown Album", comment: "Default album name")
         let artworkData = findArtwork(metadata: metadata) ?? extractArtworkViaFFmpeg(url: url)
@@ -183,6 +200,15 @@ struct MetadataParser {
         var artist = NSLocalizedString("Unknown Artist", comment: "")
         var album = NSLocalizedString("Unknown Album", comment: "")
         var lyrics: String?
+
+        // Parse "歌名 - 歌手" or "歌名-歌手" from filename
+        if let range = filename.range(of: " - ") {
+            title = String(filename[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+            artist = String(filename[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        } else if let range = filename.range(of: "-") {
+            title = String(filename[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+            artist = String(filename[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        }
 
         // Get ffmetadata for title/artist/album/lyrics
         let metaProcess = Process()

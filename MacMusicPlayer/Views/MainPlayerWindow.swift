@@ -11,16 +11,13 @@ class MainPlayerWindow: NSWindow {
         self.playerManager = playerManager
 
         let contentView = MainPlayerView(player: playerManager)
-            .environment(\.colorScheme, .dark)
 
         let hosting = NSHostingView(rootView: AnyView(contentView))
         self.hostingView = hosting
 
-        // Check if playlist was open and use expanded size based on position
-        let playlistWasOpen = UserDefaults.standard.bool(forKey: "showPlaylist")
-        let playlistPosition = UserDefaults.standard.string(forKey: "playlistPosition") ?? "right"
-        let initialWidth: CGFloat = playlistWasOpen && playlistPosition == "right" ? 1180 : 900
-        let initialHeight: CGFloat = playlistWasOpen && playlistPosition == "bottom" ? 900 : 650
+        // New layout: wider for horizontal album art + lyrics + playlist
+        let initialWidth: CGFloat = 1200
+        let initialHeight: CGFloat = 750
         let windowRect = NSRect(x: 0, y: 0, width: initialWidth, height: initialHeight)
         super.init(
             contentRect: windowRect,
@@ -38,11 +35,11 @@ class MainPlayerWindow: NSWindow {
 
         self.titlebarAppearsTransparent = true
         self.isOpaque = false
-        // Use dark background to avoid black flash when app reactivates
-        self.backgroundColor = NSColor(red: 0.031, green: 0.031, blue: 0.055, alpha: 1.0)
+        // Transparent window background — glass effect comes from NSVisualEffectView
+        self.backgroundColor = .clear
         self.hasShadow = true
 
-        // Force title text to be visible (white) regardless of background
+        // Force title text to be visible regardless of background
         self.titleVisibility = .visible
 
         // Glass background — NSVisualEffectView as the window's底层
@@ -186,16 +183,60 @@ class MainPlayerWindow: NSWindow {
         zoom(sender)
     }
 
-    /// Green button calls zoom: — post notifications to hide/show artwork during animation.
+    /// Green button calls zoom: — smooth custom animation instead of default zoom.
     override func zoom(_ sender: Any?) {
         NotificationCenter.default.post(name: .windowWillZoom, object: nil)
-        NSAnimationContext.beginGrouping()
-        NSAnimationContext.current.duration = 0
-        super.zoom(sender)
-        NSAnimationContext.endGrouping()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            NotificationCenter.default.post(name: .windowDidZoom, object: nil)
+
+        if isCurrentlyZoomed {
+            // Restore to previous size
+            guard let savedFrame = savedFrameBeforeZoom else {
+                NotificationCenter.default.post(name: .windowDidZoom, object: nil)
+                return
+            }
+
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.4
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                ctx.allowsImplicitAnimation = true
+                self.animator().setFrame(savedFrame, display: true)
+            } completionHandler: {
+                self.isCurrentlyZoomed = false
+                NotificationCenter.default.post(name: .windowDidZoom, object: nil)
+            }
+        } else {
+            // Save current frame and zoom to screen size
+            savedFrameBeforeZoom = frame
+
+            let screenFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? frame
+            let targetFrame = screenFrame
+
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.4
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                ctx.allowsImplicitAnimation = true
+                self.animator().setFrame(targetFrame, display: true)
+            } completionHandler: {
+                self.isCurrentlyZoomed = true
+                NotificationCenter.default.post(name: .windowDidZoom, object: nil)
+            }
         }
+    }
+
+    /// Custom zoom state tracking
+    private var isCurrentlyZoomed: Bool {
+        get { objc_getAssociatedObject(self, &AssociatedKeys.isZoomed) as? Bool ?? false }
+        set { objc_setAssociatedObject(self, &AssociatedKeys.isZoomed, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+
+    /// Saved frame before zoom for restoring
+    private var savedFrameBeforeZoom: NSRect? {
+        get { objc_getAssociatedObject(self, &AssociatedKeys.savedFrame) as? NSRect }
+        set { objc_setAssociatedObject(self, &AssociatedKeys.savedFrame, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
+
+    private struct AssociatedKeys {
+        static var savedFrame = "savedFrame"
+        static var isZoomed = "isZoomed"
     }
 
     /// Override close to avoid animation-related crashes during dealloc.
@@ -219,18 +260,18 @@ class MainPlayerWindow: NSWindow {
 
     /// Update the SwiftUI content without replacing the hosting view (preserves glass background).
     func updateContent(_ view: some View) {
-        hostingView.rootView = AnyView(view.environment(\.colorScheme, .dark))
+        // Respect system theme instead of forcing dark mode
+        hostingView.rootView = AnyView(view)
     }
 
-    /// Update window title to show current track name (white text, no artist).
+    /// Update window title to show current track name (no artist).
     func updateTitle() {
         if let track = playerManager.currentTrack, !track.title.isEmpty {
             self.title = track.title
         } else {
             self.title = "LX Music"
         }
-        // Force dark appearance so title text is white on our custom dark background
-        self.appearance = NSAppearance(named: .darkAqua)
+        // Let NSApp.appearance control title bar text color (set by ThemeManager)
     }
 
 }

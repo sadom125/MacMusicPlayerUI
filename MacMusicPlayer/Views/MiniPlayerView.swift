@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Mini floating player view — compact, always-on-top
+/// Mini floating player view — compact, always-on-top, matching main window style
 struct MiniPlayerView: View {
     @ObservedObject var player: PlayerManager
     @ObservedObject var themeManager = ThemeManager.shared
@@ -29,25 +29,25 @@ struct MiniPlayerView: View {
         return MetadataParser.parseArtworkDirect(from: url)
     }
 
+    private var primaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.85) : Color.black.opacity(0.85) }
+    private var secondaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.45) : Color.black.opacity(0.45) }
+    private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.5) : Color.black.opacity(0.5) }
+    private var iconColor: Color { themeManager.isDarkMode ? Color.white.opacity(0.6) : Color.black.opacity(0.6) }
+    private var playIconColor: Color { themeManager.isDarkMode ? Color.white.opacity(0.8) : Color.black.opacity(0.8) }
+    private var inactiveBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.08) : Color.black.opacity(0.08) }
+    private var btnBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.06) : Color.black.opacity(0.06) }
+    private var progressBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.15) : Color.black.opacity(0.15) }
+    private var progressFill: Color { themeManager.isDarkMode ? Color.white.opacity(0.4) : Color.black.opacity(0.4) }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // SwiftUI material — follows rounded corners automatically
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .allowsHitTesting(false)
-
-            // Dark tint overlay for depth — light enough for glass to show through
-            Rectangle()
-                .fill(Color(red: 0.031, green: 0.031, blue: 0.055).opacity(0.35))
-                .allowsHitTesting(false)
-
             VStack(spacing: 0) {
                 // Top section: album art + info
                 HStack(spacing: 10) {
                     // Album art thumbnail
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(red: 0.031, green: 0.031, blue: 0.055))
+                            .fill(inactiveBg)
                             .frame(width: 44, height: 44)
 
                         if let data = artworkData, let nsImage = NSImage(data: data) {
@@ -63,12 +63,12 @@ struct MiniPlayerView: View {
                     // Track info
                     VStack(alignment: .leading, spacing: 2) {
                         Text(player.currentTrack?.title ?? "No track")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.9))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(primaryText)
                             .lineLimit(1)
                         Text(player.currentTrack?.artist ?? "")
                             .font(.system(size: 11))
-                            .foregroundColor(themeManager.accent)
+                            .foregroundColor(secondaryText)
                             .lineLimit(1)
                     }
 
@@ -78,12 +78,12 @@ struct MiniPlayerView: View {
                     Button(action: returnToFullPlayer) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(iconColor)
                             .frame(width: 26, height: 26)
-                            .background(Color.white.opacity(0.04))
+                            .background(btnBg)
                             .cornerRadius(6)
                     }
-                    .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
+                    .buttonStyle(.plain)
                     .help("Return to full player")
                 }
                 .padding(.horizontal, 14)
@@ -93,7 +93,7 @@ struct MiniPlayerView: View {
                 // Current lyric line
                 Text(currentLyricText)
                     .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(tertiaryText)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 14)
@@ -103,10 +103,10 @@ struct MiniPlayerView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Rectangle()
-                            .fill(Color.white.opacity(0.03))
+                            .fill(progressBg)
                             .frame(height: 2)
                         Rectangle()
-                            .fill(themeManager.accent.opacity(0.4))
+                            .fill(progressFill)
                             .frame(
                                 width: geo.size.width * progressRatio,
                                 height: 2
@@ -115,41 +115,36 @@ struct MiniPlayerView: View {
                 }
                 .frame(height: 2)
 
-                // Controls — larger touch targets
+                // Controls — minimalist style matching main window
                 HStack(spacing: 20) {
                     Button(action: { player.playPrevious() }) {
                         Image(systemName: "backward.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.6))
-                            .frame(width: 40, height: 40)
+                            .font(.system(size: 14))
+                            .foregroundColor(iconColor)
                     }
-                    .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
+                    .buttonStyle(.plain)
 
                     Button(action: { player.isPlaying ? player.pause() : player.play() }) {
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(themeManager.accent)
-                            .frame(width: 48, height: 48)
-                            .background(themeManager.accent.opacity(0.08))
-                            .clipShape(Circle())
+                            .font(.system(size: 18))
+                            .foregroundColor(playIconColor)
                     }
-                    .buttonStyle(PressableButtonStyle(scaleDown: 0.88))
+                    .buttonStyle(.plain)
 
                     Button(action: { player.playNext() }) {
                         Image(systemName: "forward.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.6))
-                            .frame(width: 40, height: 40)
+                            .font(.system(size: 14))
+                            .foregroundColor(iconColor)
                     }
-                    .buttonStyle(PressableButtonStyle(scaleDown: 0.82))
+                    .buttonStyle(.plain)
                 }
-                .padding(.vertical, 10)
+                .padding(.vertical, 12)
             }
 
         }
         .frame(width: 300, height: 150)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .contentShape(RoundedRectangle(cornerRadius: 22))
         .onTapGesture(count: 2) {
             returnToFullPlayer()
         }
@@ -204,12 +199,9 @@ struct MiniPlayerView: View {
         mainWindow.level = .normal
         mainWindow.collectionBehavior = [.canJoinAllSpaces]
 
-        // Check if playlist was open and use expanded size based on position
-        let playlistWasOpen = UserDefaults.standard.bool(forKey: "showPlaylist")
-        let playlistPosition = UserDefaults.standard.string(forKey: "playlistPosition") ?? "right"
-        let wasZoomed = UserDefaults.standard.bool(forKey: "wasZoomedBeforeMini")
-        let fullWidth: CGFloat = playlistWasOpen && playlistPosition == "right" ? 1180 : 900
-        let fullHeight: CGFloat = playlistWasOpen && playlistPosition == "bottom" ? 900 : 650
+        // Use new default size
+        let fullWidth: CGFloat = 1200
+        let fullHeight: CGFloat = 750
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let targetX = screenFrame.midX - fullWidth / 2
         let targetY = screenFrame.midY - fullHeight / 2
@@ -229,24 +221,16 @@ struct MiniPlayerView: View {
         mainWindow.displayIfNeeded()
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.35
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.duration = 0.45
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             ctx.allowsImplicitAnimation = true
 
             mainWindow.animator().setFrame(targetFrame, display: true)
             mainWindow.animator().alphaValue = targetOpacity
         } completionHandler: {
             miniPanel.orderOut(nil)
-            // Restore zoom state if it was zoomed before
-            if wasZoomed && !mainWindow.isZoomed {
-                mainWindow.zoom(nil)
-            }
             // Force glass re-render after animation
             mainWindow.displayIfNeeded()
         }
     }
 }
-
-/// Bridge NSVisualEffectView for SwiftUI
-
-

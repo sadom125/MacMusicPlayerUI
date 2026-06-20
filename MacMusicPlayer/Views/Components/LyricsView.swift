@@ -93,10 +93,11 @@ struct LyricLineView: View {
     }
 
     private var foreground: Color {
+        let isDark = themeManager.isDarkMode
         switch proximity {
-        case .active: return .white
-        case .near:   return .white.opacity(0.5)
-        case .far:    return .white.opacity(0.15)
+        case .active: return isDark ? .white : .black
+        case .near:   return isDark ? .white.opacity(0.6) : .black.opacity(0.6)
+        case .far:    return isDark ? .white.opacity(0.25) : .black.opacity(0.25)
         }
     }
 }

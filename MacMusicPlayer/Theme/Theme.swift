@@ -1,4 +1,12 @@
 import SwiftUI
+import Combine
+
+/// Theme mode: follow system or force dark/light
+enum ThemeMode: String, CaseIterable {
+    case system = "System"
+    case light = "Light"
+    case dark = "Dark"
+}
 
 /// Simple solid color themes for the player.
 enum PlayerTheme: String, CaseIterable {
@@ -41,6 +49,99 @@ class ThemeManager: ObservableObject {
 
     @Published var accent: Color = PlayerTheme.current.accent
     @Published var themeName: String = PlayerTheme.current.displayName
+    @Published var themeMode: ThemeMode = {
+        let raw = UserDefaults.standard.string(forKey: "themeMode") ?? "System"
+        return ThemeMode(rawValue: raw) ?? .system
+    }()
+    @Published var isDarkMode: Bool = true
+
+    private var cancellables = Set<AnyCancellable>()
+    private var observationTimer: Timer?
+
+    init() {
+        // Start observing system appearance changes
+        startObservingAppearance()
+
+        // Listen for immediate system theme change notification
+        DistributedNotificationCenter.default.addObserver(
+            self,
+            selector: #selector(systemThemeChanged),
+            name: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil
+        )
+
+        // Initial check
+        checkSystemAppearance()
+    }
+
+    @objc private func systemThemeChanged() {
+        // Immediate check when system theme changes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.checkSystemAppearance()
+        }
+    }
+
+    deinit {
+        observationTimer?.invalidate()
+    }
+
+    /// Current effective color scheme based on theme mode
+    var colorScheme: ColorScheme? {
+        switch themeMode {
+        case .system: return nil  // Follow system
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    private func startObservingAppearance() {
+        // Poll system appearance every 0.15 seconds to detect changes quickly
+        observationTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+            self?.checkSystemAppearance()
+        }
+    }
+
+    private func checkSystemAppearance() {
+        // Check via UserDefaults (updates instantly on theme change)
+        let interfaceStyle = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") ?? ""
+        let systemIsDarkViaDefaults = interfaceStyle.lowercased() == "dark"
+
+        // Also check via NSApp (may have slight delay)
+        let systemIsDarkViaApp = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+
+        // Use whichever says dark (prioritize the faster one)
+        let systemIsDark = systemIsDarkViaDefaults || systemIsDarkViaApp
+
+        let newIsDarkMode: Bool
+        switch themeMode {
+        case .system:
+            newIsDarkMode = systemIsDark
+        case .light:
+            newIsDarkMode = false
+        case .dark:
+            newIsDarkMode = true
+        }
+
+        // Only update if changed — must dispatch to main for @Published to trigger UI
+        if isDarkMode != newIsDarkMode {
+            DispatchQueue.main.async { [weak self] in
+                self?.isDarkMode = newIsDarkMode
+                self?.updateWindowAppearance()
+            }
+        }
+    }
+
+    private func updateWindowAppearance() {
+        // Update NSApp appearance for title bar text color
+        switch themeMode {
+        case .system:
+            NSApp.appearance = nil  // Follow system
+        case .light:
+            NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark:
+            NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
 
     func cycle() {
         let all = PlayerTheme.allCases
@@ -50,5 +151,11 @@ class ThemeManager: ObservableObject {
             accent = next.accent
             themeName = next.displayName
         }
+    }
+
+    func setThemeMode(_ mode: ThemeMode) {
+        themeMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: "themeMode")
+        checkSystemAppearance()
     }
 }
