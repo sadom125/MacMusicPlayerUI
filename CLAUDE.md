@@ -6,7 +6,7 @@ macOS 原生音乐播放器，Glass 毛玻璃设计语言，SwiftUI + AppKit 混
 
 ```
 MacMusicPlayer/
-├── AppDelegate.swift
+├── AppDelegate.swift              # 应用入口 + 灵动岛管理
 ├── Managers/
 │   ├── PlayerManager.swift        # 播放控制、播放列表管理、文件名解析
 │   ├── QueuePlayerController.swift # AVQueuePlayer 封装
@@ -20,12 +20,14 @@ MacMusicPlayer/
 ├── Theme/
 │   └── Theme.swift                # ThemeManager（主题切换 + 系统跟随）
 ├── Views/
-│   ├── MainPlayerWindow.swift     # NSWindow 主窗口（NSVisualEffectView glass）
+│   ├── MainPlayerWindow.swift     # NSWindow 主窗口
 │   ├── MainPlayerView.swift       # 主界面 ZStack 布局
-│   ├── MiniPlayerWindow.swift     # NSPanel 迷你窗（圆角 22px glass）
+│   ├── MiniPlayerWindow.swift     # NSPanel 迷你窗
 │   ├── MiniPlayerView.swift       # 迷你窗内容
+│   ├── NotchPlayerWindow.swift    # 灵动岛窗口（全屏宽度 NSPanel）
+│   ├── NotchPlayerView.swift      # 灵动岛内容（NotchShape + 音乐播放器）
 │   ├── HomeView.swift             # 首页（统计 + 热力图 + 最近播放）
-│   ├── NowPlayingView.swift       # 播放页（专辑封面 + 歌词）
+│   ├── NowPlayingView.swift       # 播放页（黑胶唱片 + 歌词）
 │   └── Components/
 │       ├── CompactControlBar.swift    # 双行悬浮控制栏
 │       ├── SidePlaylistPanel.swift    # 右侧播放列表 + PlaybackHistory
@@ -55,8 +57,20 @@ MacMusicPlayer/
 ### 窗口显示
 打开时 alphaValue=0，等 0.15s glass 渲染后淡入，避免纯色闪烁。
 
-### 迷你窗 ↔ 主窗口
-MiniPlayerWindow 使用 NSPanel + NSVisualEffectView，cornerRadius 通过 backing layer 设置。
+### 灵动岛 (Dynamic Island)
+参考 boring.notch / DynamicLakePro 架构：
+- 窗口全屏宽度，覆盖屏幕顶部
+- 用 `NSScreen.auxiliaryTopLeftArea` / `auxiliaryTopRightArea` 精确定位 notch
+- 收缩状态：NotchShape 裁剪，左边图标 + 右边均衡器
+- 展开状态：340×180 卡片，封面 + 歌曲信息 + 进度条 + 控制按钮
+- 均衡器：SwiftUI Timer 驱动，红色柱子，4根
+- 动画：`.spring(response: 0.42, dampingFraction: 0.8)`
+
+### 黑胶唱片动画
+NowPlayingView 使用 `TimelineView(.periodic(from: .now, by: 1/60))` 驱动旋转。
+
+### 听歌热力图
+ListeningHeatmap 显示最近 30 天数据，10 秒自动刷新 + NotificationCenter 通知。
 
 ## 构建
 
@@ -64,10 +78,17 @@ MiniPlayerWindow 使用 NSPanel + NSVisualEffectView，cornerRadius 通过 backi
 xcodebuild -scheme MacMusicPlayer -configuration Release build
 ```
 
-DMG 打包需包含 /Applications 快捷方式。
+DMG 打包（含 Applications 快捷方式）：
+```bash
+rm -rf /tmp/dmg_build && mkdir -p /tmp/dmg_build
+cp -R <DerivedData>/Release/MacMusicPlayer.app /tmp/dmg_build/
+ln -s /Applications /tmp/dmg_build/Applications
+hdiutil create -volname "MacMusicPlayer" -srcfolder /tmp/dmg_build -ov -format UDZO ~/Downloads/MacMusicPlayer.dmg
+rm -rf /tmp/dmg_build
+```
 
 ## GitHub
 
 - Remote: `https://github.com/sadom125/MacMusicPlayerUI.git`
-- 当前版本：v2.0.0（UI 全面重设计）
-- 最近提交：`7ad27ff` feat: 添加听歌热力图 + 午夜自动刷新
+- 当前版本：v2.0.0+（UI 全面重设计 + 灵动岛）
+- 暂不推送，用户先试用

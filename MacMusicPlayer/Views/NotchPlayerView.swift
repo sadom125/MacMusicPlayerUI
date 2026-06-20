@@ -40,8 +40,8 @@ struct NotchPlayerView: View {
         .background(
             NotchBarShape()
                 .fill(Color.black)
-                .edgesIgnoringSafeArea(.all)
         )
+        .drawingGroup()
     }
 
     // MARK: - Expanded
@@ -139,8 +139,8 @@ struct NotchPlayerView: View {
         .background(
             NotchExpandedBg(radius: 22)
                 .fill(Color.black)
-                .edgesIgnoringSafeArea(.all)
         )
+        .drawingGroup()
     }
 
     // MARK: - Helpers
@@ -159,38 +159,23 @@ struct NotchPlayerView: View {
 // MARK: - Equalizer Animation
 
 struct EqualizerView: View {
-    @State private var animate = false
+    @State private var bars: [CGFloat] = [4, 4, 4, 4]
+    private let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 2.5) {
-            BarView(delay: 0.0, animate: $animate)
-            BarView(delay: 0.1, animate: $animate)
-            BarView(delay: 0.2, animate: $animate)
-            BarView(delay: 0.15, animate: $animate)
+            ForEach(0..<4, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color.white)
+                    .frame(width: 3, height: bars[i])
+            }
         }
         .frame(height: 16)
-        .onAppear { animate = true }
-    }
-}
-
-struct BarView: View {
-    let delay: Double
-    @Binding var animate: Bool
-    @State private var height: CGFloat = 4
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 1)
-            .fill(Color.white)
-            .frame(width: 3, height: height)
-            .onAppear {
-                withAnimation(
-                    .easeInOut(duration: 0.35)
-                    .repeatForever(autoreverses: true)
-                    .delay(delay)
-                ) {
-                    height = CGFloat.random(in: 6...14)
-                }
+        .onReceive(timer) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                bars = (0..<4).map { _ in CGFloat.random(in: 4...14) }
             }
+        }
     }
 }
 

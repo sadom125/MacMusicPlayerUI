@@ -68,6 +68,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Notch Player (Dynamic Island)
 
     private func setupNotchPlayer() {
+        // Always show notch player on launch
+        showNotchPlayer()
+
         // Observe playback state to show/hide notch player
         NotificationCenter.default.addObserver(
             self,
