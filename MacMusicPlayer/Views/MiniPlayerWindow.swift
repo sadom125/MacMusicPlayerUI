@@ -33,25 +33,18 @@ class MiniPlayerWindow: NSPanel {
         self.animationBehavior = .none
         self.isReleasedWhenClosed = false
 
-        // Glass background for mini player
-        let glass = NSVisualEffectView()
-        glass.material = .hudWindow
-        glass.blendingMode = .behindWindow
-        glass.state = .active
-        glass.isEmphasized = false
-        glass.autoresizingMask = [.width, .height]
-        glass.frame = self.contentView?.bounds ?? .zero
+        // Semi-transparent background for mini player
+        self.backgroundColor = NSColor(white: 0.1, alpha: 0.6)
+        self.isOpaque = false
 
         // Rounded corners on the panel
-        glass.wantsLayer = true
-        glass.layer?.cornerRadius = 22
-        glass.layer?.masksToBounds = true
+        self.contentView?.wantsLayer = true
+        self.contentView?.layer?.cornerRadius = 22
+        self.contentView?.layer?.masksToBounds = true
 
-        hosting.frame = glass.bounds
+        hosting.frame = self.contentView?.bounds ?? .zero
         hosting.autoresizingMask = [.width, .height]
-        glass.addSubview(hosting)
-
-        self.contentView = glass
+        self.contentView = hosting
     }
 
     override func close() {

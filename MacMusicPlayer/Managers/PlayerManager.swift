@@ -291,6 +291,25 @@ class PlayerManager: NSObject, ObservableObject {
             }
         }
 
+        // Parse first track's artwork & lyrics synchronously so UI has data immediately
+        if var firstTrack = newPlaylist.first {
+            let artwork = MetadataParser.parseArtworkDirect(from: firstTrack.url)
+            let lyrics = MetadataParser.parseLyricsDirect(from: firstTrack.url)
+            if artwork != nil || lyrics != nil {
+                firstTrack = Track(
+                    id: firstTrack.id,
+                    title: firstTrack.title,
+                    artist: firstTrack.artist,
+                    album: firstTrack.album,
+                    albumArtData: artwork,
+                    duration: firstTrack.duration,
+                    url: firstTrack.url,
+                    lyrics: lyrics
+                )
+                newPlaylist[0] = firstTrack
+            }
+        }
+
         DispatchQueue.main.async {
             let sortedTracks = newPlaylist.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
@@ -301,7 +320,7 @@ class PlayerManager: NSObject, ObservableObject {
             if !sortedTracks.isEmpty {
                 self.currentIndex = 0
                 self.currentTrack = sortedTracks[0]
-                self.duration = sortedTracks[0].duration
+                self.duration = sortedTracks[0].duration > 0 ? sortedTracks[0].duration : 0
                 self.playlistStore.setCurrentIndex(0)
                 self.queueController.setQueue(sortedTracks, startingAt: 0)
             } else {

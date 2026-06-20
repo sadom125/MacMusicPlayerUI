@@ -5,7 +5,6 @@ import AppKit
 class MainPlayerWindow: NSWindow {
     let hostingView: NSHostingView<AnyView>
     private let playerManager: PlayerManager
-    private var glassView: NSVisualEffectView?
 
     init(playerManager: PlayerManager) {
         self.playerManager = playerManager
@@ -35,29 +34,17 @@ class MainPlayerWindow: NSWindow {
 
         self.titlebarAppearsTransparent = true
         self.isOpaque = false
-        // Transparent window background — glass effect comes from NSVisualEffectView
-        self.backgroundColor = .clear
+        // Semi-transparent background — glass effect comes from SwiftUI .ultraThinMaterial
+        self.backgroundColor = NSColor(white: 0.1, alpha: 0.6)
         self.hasShadow = true
 
         // Force title text to be visible regardless of background
         self.titleVisibility = .visible
 
-        // Glass background — NSVisualEffectView as the window's底层
-        let glass = NSVisualEffectView()
-        glass.material = .hudWindow
-        glass.blendingMode = .behindWindow
-        glass.state = .active
-        glass.isEmphasized = false
-        glass.autoresizingMask = [.width, .height]
-        glass.frame = self.contentView?.bounds ?? .zero
-        self.glassView = glass
-
-        // Hosting view sits on top of glass
-        hosting.frame = glass.bounds
+        // Hosting view fills the window directly — no NSVisualEffectView needed
+        hosting.frame = self.contentView?.bounds ?? .zero
         hosting.autoresizingMask = [.width, .height]
-        glass.addSubview(hosting)
-
-        self.contentView = glass
+        self.contentView = hosting
 
         // Disable fullscreen to avoid macOS _NSExitFullScreenTransitionController crash.
         // Green button will zoom (maximize) instead of entering fullscreen.
@@ -66,15 +53,6 @@ class MainPlayerWindow: NSWindow {
         // Apply saved window opacity
         let savedOpacity = UserDefaults.standard.double(forKey: "windowOpacity")
         self.alphaValue = CGFloat(savedOpacity > 0 ? savedOpacity : 1.0)
-
-        // Fix: force glass view to re-render when app comes back to foreground.
-        // NSVisualEffectView briefly shows black after app reactivation.
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(appDidBecomeActive),
-            name: NSApplication.didBecomeActiveNotification,
-            object: nil
-        )
 
         self.center()
         self.acceptsMouseMovedEvents = true
@@ -246,42 +224,8 @@ class MainPlayerWindow: NSWindow {
         super.close()
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
-
-    /// Force glass view to re-render when app reactivates — fixes black/white flash.
-    @objc private func appDidBecomeActive() {
-        guard let glass = glassView else { return }
-
-        // Fade entire window out so the glass re-render is invisible to the user
-        self.alphaValue = 0.01  // near-zero but not 0 to keep window composited
-
-        // Force NSVisualEffectView to rebuild its rendering context
-        glass.state = .inactive
-        glass.needsDisplay = true
-
-        DispatchQueue.main.async {
-            glass.state = .active
-            glass.needsDisplay = true
-
-            // Wait for glass to fully re-render, then fade window back in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                let savedOpacity = UserDefaults.standard.double(forKey: "windowOpacity")
-                let targetOpacity: CGFloat = savedOpacity > 0 ? CGFloat(savedOpacity) : 1.0
-
-                NSAnimationContext.runAnimationGroup { ctx in
-                    ctx.duration = 0.3
-                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                    self.animator().alphaValue = targetOpacity
-                }
-            }
-        }
-    }
-
-    /// Update the SwiftUI content without replacing the hosting view (preserves glass background).
+    /// Update the SwiftUI content without replacing the hosting view.
     func updateContent(_ view: some View) {
-        // Respect system theme instead of forcing dark mode
         hostingView.rootView = AnyView(view)
     }
 
