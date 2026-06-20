@@ -41,7 +41,7 @@ class NotchPlayerWindow: NSPanel {
         // Above menu bar
         self.level = .statusBar
 
-        hosting.frame = NSRect(x: 0, y: 0, width: 50, height: 34)
+        hosting.frame = NSRect(x: 0, y: 0, width: 60, height: 30)
         hosting.autoresizingMask = [.width, .height]
         self.contentView = hosting
 
@@ -71,14 +71,14 @@ class NotchPlayerWindow: NSPanel {
 
         let screenFrame = screen.frame
 
-        let windowWidth: CGFloat = collapsed ? 50 : 440
-        let windowHeight: CGFloat = collapsed ? 34 : 72
+        let windowWidth: CGFloat = collapsed ? 60 : 480
+        let windowHeight: CGFloat = collapsed ? 30 : 80
 
         let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.35
+            ctx.duration = 0.4
             ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
             self.animator().setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
         }
