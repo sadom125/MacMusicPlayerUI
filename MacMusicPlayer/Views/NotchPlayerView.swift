@@ -28,32 +28,19 @@ struct NotchPlayerView: View {
         }
     }
 
-    // MARK: - Collapsed
+    // MARK: - Collapsed: flat top, rounded bottom, no icon, just equalizer
 
     private func collapsedContent(width: CGFloat, height: CGFloat) -> some View {
-        HStack(spacing: 0) {
-            if let data = artworkData, let nsImage = NSImage(data: data) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 20, height: 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            } else {
-                Image(systemName: "music.note")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white)
-            }
-
+        HStack {
             Spacer()
-
             if player.isPlaying {
                 EqualizerView()
             }
+            Spacer()
         }
-        .padding(.horizontal, 14)
         .frame(width: width, height: height)
         .background(
-            RoundedRectangle(cornerRadius: 10)
+            NotchBarShape()
                 .fill(Color.black)
         )
     }
@@ -195,6 +182,30 @@ struct EqualizerView: View {
         }
         .frame(height: 16)
         .onAppear { animating = true }
+    }
+}
+
+// MARK: - Notch Bar Shape (flat top, rounded bottom)
+
+struct NotchBarShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let r: CGFloat = 10
+
+        // Flat top
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        // Right side down to bottom-right corner
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r),
+                    radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
+        // Bottom
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r),
+                    radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
+        // Left side up
+        path.closeSubpath()
+        return path
     }
 }
 
