@@ -15,7 +15,7 @@ struct NowPlayingView: View {
     private var placeholderBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.1) : Color.black.opacity(0.08) }
 
     var body: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 16) {
             // Left: Vinyl Record
             vinylSection
 
@@ -91,9 +91,10 @@ struct NowPlayingView: View {
 
     private func startRotation() {
         rotationTimer?.invalidate()
-        // 8 seconds per full rotation, ~0.05° per frame at 60fps
         rotationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
-            rotationAngle += 360.0 / (8.0 * 60.0)  // 0.75° per tick
+            DispatchQueue.main.async {
+                self.rotationAngle += 360.0 / (8.0 * 60.0)
+            }
         }
     }
 
