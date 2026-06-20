@@ -17,6 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var songPickerWindow: SimpleSongPickerWindow?
     private(set) var mainPlayerWindow: MainPlayerWindow?
     var miniPlayerWindow: MiniPlayerWindow?
+    var notchPlayerWindow: NotchPlayerWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         playerManager = PlayerManager()
@@ -60,7 +61,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         DispatchQueue.main.async { [weak self] in
             self?.showMainWindow()
+            self?.setupNotchPlayer()
         }
+    }
+
+    // MARK: - Notch Player (Dynamic Island)
+
+    private func setupNotchPlayer() {
+        // Observe playback state to show/hide notch player
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playbackStateChanged),
+            name: NSNotification.Name("PlaybackStateChanged"),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playbackStateChanged),
+            name: NSNotification.Name("TrackChanged"),
+            object: nil
+        )
+    }
+
+    @objc private func playbackStateChanged() {
+        guard playerManager.currentTrack != nil else {
+            notchPlayerWindow?.orderOut(nil)
+            return
+        }
+        // Show notch player when playing
+        if playerManager.isPlaying {
+            showNotchPlayer()
+        } else {
+            // Keep visible when paused (user might resume)
+            showNotchPlayer()
+        }
+    }
+
+    func showNotchPlayer() {
+        if notchPlayerWindow == nil {
+            notchPlayerWindow = NotchPlayerWindow(playerManager: playerManager)
+        }
+        notchPlayerWindow?.positionAtNotch()
+        notchPlayerWindow?.orderFront(nil)
+    }
+
+    func hideNotchPlayer() {
+        notchPlayerWindow?.orderOut(nil)
     }
 
     func setupRemoteCommandCenter() {
@@ -158,6 +204,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         //    Without this, those callbacks hold dangling references during dealloc.
         mainPlayerWindow?.contentView = nil
         miniPlayerWindow?.contentView = nil
+        notchPlayerWindow?.orderOut(nil)
 
         // 2. Save playback position before stopping
         playerManager.savePlaybackPosition()

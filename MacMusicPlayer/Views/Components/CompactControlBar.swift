@@ -170,13 +170,13 @@ struct CompactControlBar: View {
             }
             .buttonStyle(.plain)
 
-            // Mini Player Toggle
-            Button(action: onMiniPlayerToggle) {
-                Image(systemName: "arrow.down.forward.and.arrow.up.backward")
-                    .font(.system(size: 11))
-                    .foregroundColor(iconColor)
-            }
-            .buttonStyle(.plain)
+            // Mini Player Toggle — hidden for now (replaced by notch player)
+            // Button(action: onMiniPlayerToggle) {
+            //     Image(systemName: "arrow.down.forward.and.arrow.up.backward")
+            //         .font(.system(size: 11))
+            //         .foregroundColor(iconColor)
+            // }
+            // .buttonStyle(.plain)
         }
         .onAppear {
             volume = player.volume
