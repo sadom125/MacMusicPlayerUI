@@ -254,8 +254,10 @@ class MainPlayerWindow: NSWindow {
     @objc private func appDidBecomeActive() {
         guard let glass = glassView else { return }
 
+        // Hide content so user sees only glass while it re-renders
+        hostingView.alphaValue = 0
+
         // Force NSVisualEffectView to rebuild its rendering context
-        // by toggling its state. This triggers a full re-render of the glass material.
         glass.state = .inactive
         glass.needsDisplay = true
 
@@ -263,6 +265,15 @@ class MainPlayerWindow: NSWindow {
             glass.state = .active
             glass.needsDisplay = true
             self.displayIfNeeded()
+
+            // Fade content back in after glass has rendered
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0.25
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    self.hostingView.animator().alphaValue = 1.0
+                }
+            }
         }
     }
 
