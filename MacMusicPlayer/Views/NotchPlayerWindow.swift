@@ -15,7 +15,7 @@ class NotchPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 50, height: 34),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -38,19 +38,31 @@ class NotchPlayerWindow: NSPanel {
             .ignoresCycle,
         ]
 
-        // Above menu bar, below system alerts
+        // Above menu bar
         self.level = .statusBar
 
-        // Set hosting view frame before assigning
-        hosting.frame = NSRect(x: 0, y: 0, width: 300, height: 44)
+        hosting.frame = NSRect(x: 0, y: 0, width: 50, height: 34)
         hosting.autoresizingMask = [.width, .height]
         self.contentView = hosting
 
-        positionAtNotch()
+        positionAtNotch(collapsed: true)
+
+        // Listen for expand/collapse changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleExpandChange(_:)),
+            name: NSNotification.Name("NotchPlayerExpandChanged"),
+            object: nil
+        )
     }
 
-    /// Calculate notch size and position the window at the top-center of the screen.
-    func positionAtNotch() {
+    @objc private func handleExpandChange(_ notification: Notification) {
+        guard let expanded = notification.userInfo?["expanded"] as? Bool else { return }
+        positionAtNotch(collapsed: !expanded)
+    }
+
+    /// Position the window at the notch. Collapsed = small pill, expanded = wider panel.
+    func positionAtNotch(collapsed: Bool = true) {
         guard let screen = NSScreen.main else { return }
         guard screen.safeAreaInsets.top > 0 else {
             self.orderOut(nil)
@@ -59,28 +71,26 @@ class NotchPlayerWindow: NSPanel {
 
         let screenFrame = screen.frame
 
-        // Calculate notch width from auxiliary areas
-        let leftPadding = screen.auxiliaryTopLeftArea?.width ?? 0
-        let rightPadding = screen.auxiliaryTopRightArea?.width ?? 0
-        let notchWidth: CGFloat
-        if leftPadding > 0 && rightPadding > 0 {
-            notchWidth = screenFrame.width - leftPadding - rightPadding
-        } else {
-            notchWidth = 120
-        }
-
-        // Window wider than notch for content, centered
-        let windowWidth: CGFloat = max(notchWidth + 100, 300)
-        let windowHeight: CGFloat = 44
+        let windowWidth: CGFloat = collapsed ? 50 : 440
+        let windowHeight: CGFloat = collapsed ? 34 : 72
 
         let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
 
-        self.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.35
+            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
+            self.animator().setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
+        }
     }
 
     override func close() {
         self.animations = [:]
+        NotificationCenter.default.removeObserver(self)
         super.close()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
