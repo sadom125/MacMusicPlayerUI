@@ -61,7 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         DispatchQueue.main.async { [weak self] in
             self?.showMainWindow()
-            self?.setupNotchPlayer()
+            // self?.setupNotchPlayer()  // 灵动岛功能暂时隐藏
         }
     }
 

@@ -48,7 +48,7 @@ struct NotchPlayerView: View {
     private func collapsedContent(width: CGFloat, height: CGFloat) -> some View {
         HStack {
             Spacer()
-            EqualizerView(isPlaying: player.isPlaying)
+            CollapsedEqualizer(isPlaying: player.isPlaying)
             Spacer()
         }
         .frame(width: width, height: height)
@@ -182,19 +182,20 @@ class EqualizerState: ObservableObject {
         let source = DispatchSource.makeTimerSource(queue: .main)
         source.schedule(deadline: .now(), repeating: .milliseconds(100))
         source.setEventHandler { [weak self] in
-            guard let self = self, self.isPlaying else { return }
-            self.tick += 0.1
-            // 双正弦波叠加 + 有机噪声，模拟真实音乐跳动
-            let newBars = (0..<4).map { i in
-                let phase = self.tick + Double(i) * 0.7
-                let wave1 = sin(phase * 3.0) * 0.4
-                let wave2 = sin(phase * 1.8 + 1.2) * 0.3
-                let noise = Double.random(in: -0.1...0.1)
-                let combined = 0.5 + wave1 + wave2 + noise
-                let h = 4 + combined * 10
-                return CGFloat(max(3, min(16, h)))
+            guard let self = self else { return }
+            if self.isPlaying {
+                self.tick += 0.1
+                let newBars = (0..<4).map { i in
+                    let phase = self.tick + Double(i) * 0.7
+                    let wave1 = sin(phase * 3.0) * 0.4
+                    let wave2 = sin(phase * 1.8 + 1.2) * 0.3
+                    let noise = Double.random(in: -0.1...0.1)
+                    let combined = 0.5 + wave1 + wave2 + noise
+                    let h = 4 + combined * 10
+                    return CGFloat(max(3, min(16, h)))
+                }
+                self.bars = newBars
             }
-            self.bars = newBars
         }
         objc_setAssociatedObject(self, &Self.timerKey, source, .OBJC_ASSOCIATION_RETAIN)
         source.resume()
@@ -210,14 +211,18 @@ class EqualizerState: ObservableObject {
 
 struct EqualizerView: View {
     var isPlaying: Bool = true
+    var barWidth: CGFloat = 3
+    var barSpacing: CGFloat = 3
+    var maxBarHeight: CGFloat = 14
+    var barColor: Color = .white
     @StateObject private var state = EqualizerState()
 
     var body: some View {
-        HStack(spacing: 2.5) {
+        HStack(spacing: barSpacing) {
             ForEach(0..<4, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.white)
-                    .frame(width: 3, height: state.bars[i])
+                    .fill(barColor)
+                    .frame(width: barWidth, height: state.bars[i])
                     .animation(
                         .spring(response: 0.12, dampingFraction: 0.55)
                             .delay(Double(i) * 0.04),
@@ -225,13 +230,10 @@ struct EqualizerView: View {
                     )
             }
         }
-        .frame(height: 16)
+        .frame(height: maxBarHeight + 4)
         .onAppear {
             state.isPlaying = isPlaying
             state.startTimer()
-        }
-        .onDisappear {
-            state.stopTimer()
         }
         .onChange(of: isPlaying) { v in
             state.isPlaying = v
@@ -239,6 +241,45 @@ struct EqualizerView: View {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                     state.bars = [4, 4, 4, 4]
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Collapsed Equalizer (独立实现，更可靠)
+
+struct CollapsedEqualizer: View {
+    var isPlaying: Bool = true
+    @State private var bars: [CGFloat] = [6, 6, 6, 6]
+    @State private var timer: Timer?
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<4, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color.red)
+                    .frame(width: 3, height: bars[i])
+                    .animation(.spring(response: 0.12, dampingFraction: 0.55).delay(Double(i) * 0.04), value: bars[i])
+            }
+        }
+        .frame(height: 22)
+        .onAppear { restartTimer() }
+        .onChange(of: isPlaying) { _ in restartTimer() }
+    }
+
+    private func restartTimer() {
+        timer?.invalidate()
+        if isPlaying {
+            timer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { _ in
+                let newBars = (0..<4).map { _ in CGFloat.random(in: 5...20) }
+                withAnimation(.spring(response: 0.12, dampingFraction: 0.55)) {
+                    bars = newBars
+                }
+            }
+            if let t = timer { RunLoop.main.add(t, forMode: .common) }
+        } else {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) {
+                bars = [6, 6, 6, 6]
             }
         }
     }
