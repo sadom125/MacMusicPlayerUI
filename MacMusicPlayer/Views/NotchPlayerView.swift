@@ -27,11 +27,10 @@ struct NotchPlayerView: View {
         }
     }
 
-    // MARK: - Collapsed: wider than notch, icon left, equalizer right
+    // MARK: - Collapsed
 
     private func collapsedContent(width: CGFloat, height: CGFloat) -> some View {
         HStack(spacing: 0) {
-            // Left: music icon
             if let data = artworkData, let nsImage = NSImage(data: data) {
                 Image(nsImage: nsImage)
                     .resizable()
@@ -46,53 +45,35 @@ struct NotchPlayerView: View {
 
             Spacer()
 
-            // Right: equalizer (always shown when playing)
             if player.isPlaying {
                 EqualizerView()
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .frame(width: width, height: height)
-        .background(Color.black)
-        .clipShape(NotchBarShape())
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black)
+                .padding(.vertical, 0)
+        )
+        .clipped()
     }
 
     // MARK: - Expanded
 
     private func expandedContent(width: CGFloat, height: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Top connector bar
-            HStack(spacing: 0) {
-                if let data = artworkData, let nsImage = NSImage(data: data) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 22, height: 22)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                } else {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white)
-                }
-                Spacer()
-                if player.isPlaying {
-                    EqualizerView()
-                }
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 36)
-
-            // Main content
+            // Content area
             HStack(spacing: 14) {
-                // Album art (large, rounded)
+                // Album art
                 if let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 64, height: 64)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.1))
                         .frame(width: 64, height: 64)
                         .overlay(
@@ -102,7 +83,7 @@ struct NotchPlayerView: View {
                         )
                 }
 
-                // Track info
+                // Info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(player.currentTrack?.title ?? "Not Playing")
                         .font(.system(size: 16, weight: .bold))
@@ -116,13 +97,12 @@ struct NotchPlayerView: View {
 
                 Spacer()
 
-                // Equalizer on right
                 if player.isPlaying {
                     EqualizerView()
                 }
             }
             .padding(.horizontal, 18)
-            .padding(.top, 6)
+            .padding(.top, 12)
 
             // Progress bar
             VStack(spacing: 4) {
@@ -151,7 +131,7 @@ struct NotchPlayerView: View {
             .padding(.horizontal, 18)
             .padding(.top, 10)
 
-            // Controls (large, centered)
+            // Controls
             HStack(spacing: 36) {
                 Button(action: { player.playPrevious() }) {
                     Image(systemName: "backward.fill")
@@ -178,8 +158,10 @@ struct NotchPlayerView: View {
             .padding(.bottom, 16)
         }
         .frame(width: width, height: height)
-        .background(Color.black)
-        .clipShape(ExpandedBarShape())
+        .background(
+            NotchExpandedBg(radius: 20)
+                .fill(Color.black)
+        )
     }
 
     // MARK: - Helpers
@@ -192,46 +174,6 @@ struct NotchPlayerView: View {
     private func formatTime(_ seconds: TimeInterval) -> String {
         guard seconds.isFinite && seconds >= 0 else { return "0:00" }
         return String(format: "%d:%02d", Int(seconds) / 60, Int(seconds) % 60)
-    }
-}
-
-// MARK: - Notch Bar Shape (flat top, rounded bottom corners)
-
-struct NotchBarShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let r: CGFloat = 12
-
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
-        path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r),
-                    radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
-        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
-        path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r),
-                    radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
-        path.closeSubpath()
-        return path
-    }
-}
-
-// MARK: - Expanded Bar Shape (wider, bigger bottom radius)
-
-struct ExpandedBarShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let r: CGFloat = 20
-
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
-        path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r),
-                    radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
-        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
-        path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r),
-                    radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
-        path.closeSubpath()
-        return path
     }
 }
 
@@ -256,5 +198,25 @@ struct EqualizerView: View {
         }
         .frame(height: 16)
         .onAppear { animating = true }
+    }
+}
+
+// MARK: - Bottom-Only Rounded Rectangle
+
+struct NotchExpandedBg: Shape {
+    var radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+        path.addArc(center: CGPoint(x: rect.maxX - radius, y: rect.maxY - radius),
+                    radius: radius, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
+        path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+        path.addArc(center: CGPoint(x: rect.minX + radius, y: rect.maxY - radius),
+                    radius: radius, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
+        path.closeSubpath()
+        return path
     }
 }

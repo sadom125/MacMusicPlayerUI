@@ -18,7 +18,7 @@ class NotchPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 240, height: 36),
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 36),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -75,8 +75,8 @@ class NotchPlayerWindow: NSPanel {
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.frame
 
-        let windowWidth: CGFloat = expanded ? 420 : 240
-        let windowHeight: CGFloat = expanded ? 170 : 36
+        let windowWidth: CGFloat = expanded ? 440 : 300
+        let windowHeight: CGFloat = expanded ? 180 : 36
 
         let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
@@ -91,9 +91,9 @@ class NotchPlayerWindow: NSPanel {
     private func positionAtNotch() {
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.frame
-        let x = screenFrame.midX - 240 / 2
+        let x = screenFrame.midX - 300 / 2
         let y = screenFrame.maxY - 36
-        self.setFrame(NSRect(x: x, y: y, width: 240, height: 36), display: false)
+        self.setFrame(NSRect(x: x, y: y, width: 300, height: 36), display: false)
     }
 
     func toggleExpanded() {
