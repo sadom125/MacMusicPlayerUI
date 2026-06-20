@@ -22,6 +22,7 @@ struct MainPlayerView: View {
 
     // Window height for full-size playlist panel
     @State private var windowHeight: CGFloat = 750
+    @State private var showRhythm: Bool = false
 
     /// Artwork from Track model, falling back to synchronous FLAC scan.
     private var currentArtworkData: Data? {
@@ -67,7 +68,8 @@ struct MainPlayerView: View {
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                     showPlaylist.toggle()
                                 }
-                            }
+                            },
+                            showRhythm: $showRhythm
                         )
                         Spacer()
                     }
@@ -141,7 +143,8 @@ struct MainPlayerView: View {
                 artworkData: currentArtworkData,
                 lyrics: lyrics,
                 currentLineIndex: lastLyricIndex,
-                isPlaying: player.isPlaying
+                isPlaying: player.isPlaying,
+                showRhythm: showRhythm
             )
         }
     }

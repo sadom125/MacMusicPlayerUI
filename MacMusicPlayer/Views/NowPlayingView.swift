@@ -6,6 +6,7 @@ struct NowPlayingView: View {
     let lyrics: [LyricLine]
     let currentLineIndex: Int
     var isPlaying: Bool = false
+    var showRhythm: Bool = false
 
     @ObservedObject var themeManager = ThemeManager.shared
 
@@ -14,8 +15,16 @@ struct NowPlayingView: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // Left: Vinyl Record
-            vinylSection
+            // Left: Vinyl Record + Rhythm
+            VStack(spacing: 12) {
+                vinylSection
+                    .offset(x: 20, y: -10)
+
+                if showRhythm {
+                    MusicRhythmView(isPlaying: isPlaying)
+                        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .top)))
+                }
+            }
 
             // Right: Lyrics
             lyricsSection
@@ -99,5 +108,69 @@ struct NowPlayingView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Music Rhythm Animation
+
+class RhythmState: ObservableObject {
+    @Published var bars: [CGFloat] = Array(repeating: 6, count: 18)
+    var isPlaying = false
+    private static var timerKey = "rhythmTimer"
+
+    func startTimer() {
+        stopTimer()
+        let source = DispatchSource.makeTimerSource(queue: .main)
+        source.schedule(deadline: .now(), repeating: .milliseconds(110))
+        source.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            if self.isPlaying {
+                self.bars = (0..<18).map { _ in CGFloat.random(in: 6...42) }
+            }
+        }
+        objc_setAssociatedObject(self, &Self.timerKey, source, .OBJC_ASSOCIATION_RETAIN)
+        source.resume()
+    }
+
+    func stopTimer() {
+        if let source = objc_getAssociatedObject(self, &Self.timerKey) as? DispatchSourceTimer {
+            source.cancel()
+        }
+        objc_setAssociatedObject(self, &Self.timerKey, nil, .OBJC_ASSOCIATION_RETAIN)
+    }
+}
+
+struct MusicRhythmView: View {
+    var isPlaying: Bool = false
+    @StateObject private var state = RhythmState()
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<18, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(
+                        LinearGradient(
+                            colors: [.red.opacity(0.8), .orange.opacity(0.6)],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                    )
+                    .frame(width: 4, height: state.bars[i])
+                    .animation(.spring(response: 0.12, dampingFraction: 0.55).delay(Double(i) * 0.018), value: state.bars[i])
+            }
+        }
+        .frame(width: 320, height: 50)
+        .onAppear {
+            state.isPlaying = isPlaying
+            state.startTimer()
+        }
+        .onChange(of: isPlaying) { v in
+            state.isPlaying = v
+            if !v {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                    state.bars = Array(repeating: 6, count: 18)
+                }
+            }
+        }
     }
 }

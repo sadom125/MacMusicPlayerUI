@@ -8,6 +8,7 @@ struct CompactControlBar: View {
     @Binding var isVisible: Bool
     var onMiniPlayerToggle: () -> Void
     var onPlaylistToggle: () -> Void
+    @Binding var showRhythm: Bool
 
     @State private var volume: Float = 0.3
     @ObservedObject var themeManager = ThemeManager.shared
@@ -170,13 +171,13 @@ struct CompactControlBar: View {
             }
             .buttonStyle(.plain)
 
-            // Mini Player Toggle — hidden for now (replaced by notch player)
-            // Button(action: onMiniPlayerToggle) {
-            //     Image(systemName: "arrow.down.forward.and.arrow.up.backward")
-            //         .font(.system(size: 11))
-            //         .foregroundColor(iconColor)
-            // }
-            // .buttonStyle(.plain)
+            // Rhythm Toggle
+            Button(action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { showRhythm.toggle() } }) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 12))
+                    .foregroundColor(showRhythm ? .red : iconColor)
+            }
+            .buttonStyle(.plain)
         }
         .onAppear {
             volume = player.volume
