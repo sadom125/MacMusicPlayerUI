@@ -1,13 +1,12 @@
 import SwiftUI
 
-/// Mini floating player view — compact, always-on-top, matching main window style
+/// Mini floating player — capsule design with album disc, info, and controls.
 struct MiniPlayerView: View {
     @ObservedObject var player: PlayerManager
     @ObservedObject var themeManager = ThemeManager.shared
     @State private var cachedLyrics: [LyricLine] = []
     @State private var cachedTrackID: UUID? = nil
 
-    /// Current active lyric line for display
     private var currentLyricText: String {
         guard !cachedLyrics.isEmpty, let track = player.currentTrack else {
             return player.currentTrack?.title ?? ""
@@ -22,129 +21,126 @@ struct MiniPlayerView: View {
         return lineText
     }
 
-    /// Album art data with sync fallback
     private var artworkData: Data? {
         if let data = player.currentTrack?.albumArtData { return data }
         guard let url = player.currentTrack?.url else { return nil }
         return MetadataParser.parseArtworkDirect(from: url)
     }
 
-    private var primaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.85) : Color.black.opacity(0.85) }
-    private var secondaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.45) : Color.black.opacity(0.45) }
-    private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.5) : Color.black.opacity(0.5) }
-    private var iconColor: Color { themeManager.isDarkMode ? Color.white.opacity(0.6) : Color.black.opacity(0.6) }
-    private var playIconColor: Color { themeManager.isDarkMode ? Color.white.opacity(0.8) : Color.black.opacity(0.8) }
-    private var inactiveBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.08) : Color.black.opacity(0.08) }
-    private var btnBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.06) : Color.black.opacity(0.06) }
-    private var progressBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.15) : Color.black.opacity(0.15) }
-    private var progressFill: Color { themeManager.isDarkMode ? Color.white.opacity(0.4) : Color.black.opacity(0.4) }
+    // MARK: - Theme Colors
+
+    private var primaryText: Color { themeManager.isDarkMode ? .white.opacity(0.9) : .black.opacity(0.85) }
+    private var secondaryText: Color { themeManager.isDarkMode ? .white.opacity(0.45) : .black.opacity(0.45) }
+    private var iconColor: Color { themeManager.isDarkMode ? .white.opacity(0.7) : .black.opacity(0.6) }
+    private var playBtnBg: Color { themeManager.isDarkMode ? .white.opacity(0.15) : .black.opacity(0.08) }
+    private var progressBg: Color { themeManager.isDarkMode ? .white.opacity(0.12) : .black.opacity(0.08) }
+    private var progressFill: Color { themeManager.isDarkMode ? .white.opacity(0.5) : .black.opacity(0.45) }
+    private var separatorColor: Color { themeManager.isDarkMode ? .white.opacity(0.08) : .black.opacity(0.06) }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            VStack(spacing: 0) {
-                // Top section: album art + info
-                HStack(spacing: 10) {
-                    // Album art thumbnail
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(inactiveBg)
-                            .frame(width: 44, height: 44)
-
-                        if let data = artworkData, let nsImage = NSImage(data: data) {
-                            Image(nsImage: nsImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 44, height: 44)
-                                .clipped()
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                    // Track info
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(player.currentTrack?.title ?? "No track")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(primaryText)
-                            .lineLimit(1)
-                        Text(player.currentTrack?.artist ?? "")
-                            .font(.system(size: 11))
-                            .foregroundColor(secondaryText)
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    // Return to full player button
-                    Button(action: returnToFullPlayer) {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(iconColor)
-                            .frame(width: 26, height: 26)
-                            .background(btnBg)
-                            .cornerRadius(6)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Return to full player")
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, 6)
-
-                // Current lyric line
-                Text(currentLyricText)
-                    .font(.system(size: 11))
-                    .foregroundColor(tertiaryText)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 8)
-
-                // Thin progress bar
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(progressBg)
-                            .frame(height: 2)
-                        Rectangle()
-                            .fill(progressFill)
-                            .frame(
-                                width: geo.size.width * progressRatio,
-                                height: 2
+        VStack(spacing: 0) {
+            // Main row: disc + info + expand button
+            HStack(spacing: 12) {
+                // Mini vinyl disc
+                ZStack {
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: 40, height: 40)
+                    if let data = artworkData, let nsImage = NSImage(data: data) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 24, height: 24)
+                            .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color.white.opacity(0.1))
+                            .frame(width: 24, height: 24)
+                            .overlay(
+                                Image(systemName: "music.note")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.white.opacity(0.4))
                             )
                     }
+                    // Center dot
+                    Circle()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 3, height: 3)
                 }
-                .frame(height: 2)
 
-                // Controls — minimalist style matching main window
-                HStack(spacing: 20) {
-                    Button(action: { player.playPrevious() }) {
-                        Image(systemName: "backward.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(iconColor)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: { player.isPlaying ? player.pause() : player.play() }) {
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(playIconColor)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: { player.playNext() }) {
-                        Image(systemName: "forward.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(iconColor)
-                    }
-                    .buttonStyle(.plain)
+                // Track info
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(player.currentTrack?.title ?? "No track")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(primaryText)
+                        .lineLimit(1)
+                    Text(player.currentTrack?.artist ?? "")
+                        .font(.system(size: 10))
+                        .foregroundColor(secondaryText)
+                        .lineLimit(1)
                 }
-                .padding(.vertical, 12)
+
+                Spacer(minLength: 4)
+
+                // Expand button
+                Button(action: returnToFullPlayer) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(iconColor)
+                }
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
 
+            // Progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(progressBg).frame(height: 2)
+                    Rectangle().fill(progressFill)
+                        .frame(width: geo.size.width * progressRatio, height: 2)
+                        .animation(.linear(duration: 0.3), value: progressRatio)
+                }
+            }
+            .frame(height: 2)
+
+            // Controls row
+            HStack(spacing: 0) {
+                Button(action: { player.playPrevious() }) {
+                    Image(systemName: "backward.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(iconColor)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button(action: { player.isPlaying ? player.pause() : player.play() }) {
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(primaryText)
+                        .frame(width: 36, height: 36)
+                        .background(playBtnBg)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Button(action: { player.playNext() }) {
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(iconColor)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 8)
         }
-        .frame(width: 300, height: 150)
-        .clipShape(RoundedRectangle(cornerRadius: 22))
-        .contentShape(RoundedRectangle(cornerRadius: 22))
+        .frame(width: 280, height: 110)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .contentShape(RoundedRectangle(cornerRadius: 18))
         .onTapGesture(count: 2) {
             returnToFullPlayer()
         }
@@ -164,7 +160,6 @@ struct MiniPlayerView: View {
             cachedTrackID = nil
             return
         }
-        // Try Track model, then direct scan
         if let lrcText = track.lyrics ?? MetadataParser.parseLyricsDirect(from: track.url),
            !lrcText.isEmpty {
             cachedLyrics = LrcParser.parse(lrcText: lrcText)
@@ -180,7 +175,6 @@ struct MiniPlayerView: View {
     }
 
     private func returnToFullPlayer() {
-        // Get mini player window frame for animation start point
         guard let miniPanel = NSApplication.shared.windows.first(where: { $0 is MiniPlayerWindow }) else { return }
         let miniFrame = miniPanel.frame
 
@@ -189,50 +183,44 @@ struct MiniPlayerView: View {
             return
         }
 
-        // Reuse the existing hosting view (preserves glass background)
         mainWindow.updateContent(MainPlayerView(player: player))
 
-        // Configure full window style
         mainWindow.titleVisibility = .visible
         mainWindow.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         mainWindow.isMovableByWindowBackground = false
         mainWindow.level = .normal
         mainWindow.collectionBehavior = [.canJoinAllSpaces]
 
-        // Use new default size
         let fullWidth: CGFloat = 1200
         let fullHeight: CGFloat = 750
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let targetX = screenFrame.midX - fullWidth / 2
-        let targetY = screenFrame.midY - fullHeight / 2
-        let targetFrame = NSRect(x: targetX, y: targetY, width: fullWidth, height: fullHeight)
+        let targetFrame = NSRect(
+            x: screenFrame.midX - fullWidth / 2,
+            y: screenFrame.midY - fullHeight / 2,
+            width: fullWidth,
+            height: fullHeight
+        )
 
-        // Restore saved window opacity
         let savedOpacity = UserDefaults.standard.double(forKey: "windowOpacity")
-        let targetOpacity = savedOpacity > 0 ? CGFloat(savedOpacity) : 1.0
+        let targetOpacity: CGFloat = savedOpacity > 0 ? CGFloat(savedOpacity) : 1.0
 
-        // Start full window at mini player position/size, then animate to centered target
+        // Start at mini position, invisible
         mainWindow.setFrame(miniFrame, display: false)
         mainWindow.alphaValue = 0.0
         mainWindow.makeKeyAndOrderFront(nil)
         mainWindow.updateTitle()
 
-        // Force glass view redraw to avoid black flash
-        mainWindow.displayIfNeeded()
-
-        // Delay slightly to let glass render before animating in
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // Spring animation from mini to full
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.45
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                ctx.duration = 0.5
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
                 ctx.allowsImplicitAnimation = true
 
                 mainWindow.animator().setFrame(targetFrame, display: true)
                 mainWindow.animator().alphaValue = targetOpacity
             } completionHandler: {
                 miniPanel.orderOut(nil)
-                // Force glass re-render after animation
-                mainWindow.displayIfNeeded()
             }
         }
     }

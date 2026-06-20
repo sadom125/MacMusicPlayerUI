@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Floating mini player panel that sits above all windows.
+/// Floating mini player panel — capsule design.
 class MiniPlayerWindow: NSPanel {
     private let hostingView: NSHostingView<AnyView>
 
@@ -15,7 +15,7 @@ class MiniPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 150),
+            contentRect: NSRect(x: 0, y: 0, width: 280, height: 110),
             styleMask: [.nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -25,22 +25,24 @@ class MiniPlayerWindow: NSPanel {
         self.level = .floating
         self.isMovableByWindowBackground = true
         self.isOpaque = false
-        self.backgroundColor = .clear
-        self.hasShadow = false
+        self.backgroundColor = NSColor(white: 0.12, alpha: 0.75)
+        self.hasShadow = true
         self.ignoresMouseEvents = false
         self.acceptsMouseMovedEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         self.animationBehavior = .none
         self.isReleasedWhenClosed = false
 
-        // Semi-transparent background for mini player
-        self.backgroundColor = NSColor(white: 0.1, alpha: 0.6)
-        self.isOpaque = false
-
-        // Rounded corners on the panel
+        // Rounded corners
         self.contentView?.wantsLayer = true
-        self.contentView?.layer?.cornerRadius = 22
+        self.contentView?.layer?.cornerRadius = 18
         self.contentView?.layer?.masksToBounds = true
+
+        // Drop shadow
+        self.contentView?.layer?.shadowColor = NSColor.black.cgColor
+        self.contentView?.layer?.shadowOpacity = 0.3
+        self.contentView?.layer?.shadowOffset = CGSize(width: 0, height: -2)
+        self.contentView?.layer?.shadowRadius = 12
 
         hosting.frame = self.contentView?.bounds ?? .zero
         hosting.autoresizingMask = [.width, .height]

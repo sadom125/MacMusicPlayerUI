@@ -359,17 +359,25 @@ struct MainPlayerView: View {
         miniWindow.setFrame(sourceFrame, display: false)
         miniWindow.alphaValue = 0.0
 
-        fullWindow.orderOut(nil)
-
-        miniWindow.orderFront(nil)
-
+        // Fade out main window
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.45
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            ctx.allowsImplicitAnimation = true
+            ctx.duration = 0.2
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            fullWindow.animator().alphaValue = 0.0
+        } completionHandler: {
+            fullWindow.orderOut(nil)
+            fullWindow.alphaValue = 1.0
 
-            miniWindow.animator().setFrame(targetFrame, display: true)
-            miniWindow.animator().alphaValue = 1.0
+            // Show mini window with spring animation
+            miniWindow.orderFront(nil)
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.4
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
+                ctx.allowsImplicitAnimation = true
+
+                miniWindow.animator().setFrame(targetFrame, display: true)
+                miniWindow.animator().alphaValue = 1.0
+            }
         }
     }
 }
