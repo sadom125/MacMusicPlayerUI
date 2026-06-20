@@ -40,8 +40,8 @@ struct NotchPlayerView: View {
         .background(
             NotchBarShape()
                 .fill(Color.black)
+                .edgesIgnoringSafeArea(.all)
         )
-        .drawingGroup()
     }
 
     // MARK: - Expanded
@@ -139,8 +139,8 @@ struct NotchPlayerView: View {
         .background(
             NotchExpandedBg(radius: 22)
                 .fill(Color.black)
+                .edgesIgnoringSafeArea(.all)
         )
-        .drawingGroup()
     }
 
     // MARK: - Helpers
