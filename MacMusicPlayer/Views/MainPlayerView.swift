@@ -241,6 +241,8 @@ struct MainPlayerView: View {
             if lastLyricIndex != -1 { lastLyricIndex = -1 }
             return
         }
+        // Guard against stale lastLyricIndex when lyrics array shrinks (e.g. track change)
+        if lastLyricIndex >= lyrics.count { lastLyricIndex = -1 }
         let startIdx = (time > (lastLyricIndex >= 0 ? lyrics[lastLyricIndex].time : -1))
             ? lastLyricIndex >= 0 ? lastLyricIndex : 0
             : 0
