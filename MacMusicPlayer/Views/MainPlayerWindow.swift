@@ -279,8 +279,22 @@ class MainPlayerWindow: NSWindow {
 extension MainPlayerWindow {
     static func show(playerManager: PlayerManager) -> MainPlayerWindow {
         let window = MainPlayerWindow(playerManager: playerManager)
+
+        // Start invisible to avoid flash of solid background before glass renders
+        let targetOpacity = window.alphaValue
+        window.alphaValue = 0
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Fade in after glass effect has rendered
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.25
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                window.animator().alphaValue = targetOpacity
+            }
+        }
+
         return window
     }
 }

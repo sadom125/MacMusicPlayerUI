@@ -220,17 +220,20 @@ struct MiniPlayerView: View {
         // Force glass view redraw to avoid black flash
         mainWindow.displayIfNeeded()
 
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.45
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            ctx.allowsImplicitAnimation = true
+        // Delay slightly to let glass render before animating in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.45
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                ctx.allowsImplicitAnimation = true
 
-            mainWindow.animator().setFrame(targetFrame, display: true)
-            mainWindow.animator().alphaValue = targetOpacity
-        } completionHandler: {
-            miniPanel.orderOut(nil)
-            // Force glass re-render after animation
-            mainWindow.displayIfNeeded()
+                mainWindow.animator().setFrame(targetFrame, display: true)
+                mainWindow.animator().alphaValue = targetOpacity
+            } completionHandler: {
+                miniPanel.orderOut(nil)
+                // Force glass re-render after animation
+                mainWindow.displayIfNeeded()
+            }
         }
     }
 }
