@@ -1,12 +1,10 @@
 import SwiftUI
 import AppKit
 
-/// Full-width panel covering the entire top bar — hides the notch seamlessly.
+/// Panel covering only the notch area — click to expand.
 class NotchPlayerWindow: NSPanel {
     private let hostingView: NSHostingView<AnyView>
     private var expandedState = false
-    private var mouseMonitor: Any?
-    private var hoverTimer: Timer?
     private weak var playerManager: PlayerManager?
 
     override var canBecomeKey: Bool { true }
@@ -20,7 +18,7 @@ class NotchPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 1512, height: 34),
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 36),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -53,13 +51,11 @@ class NotchPlayerWindow: NSPanel {
             .ignoresCycle,
         ]
 
-        // Above menu bar level (AXSystemDialog equivalent)
         self.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)
 
         self.contentView = hostingView
 
-        positionFullScreenWidth()
-        startHoverMonitor()
+        positionAtNotch()
     }
 
     private func refreshView() {
@@ -77,17 +73,17 @@ class NotchPlayerWindow: NSPanel {
 
     // MARK: - Layout
 
-    /// Collapsed: full-width bar at top, height = notch height
-    /// Expanded: extends downward from top
+    /// Collapsed: covers only the notch area
+    /// Expanded: wider panel dropping down from notch
     private func updateLayout(expanded: Bool) {
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.frame
         let notchHeight = screen.safeAreaInsets.top
 
-        let windowWidth = screenFrame.width
-        let windowHeight: CGFloat = expanded ? notchHeight + 130 : max(notchHeight, 34)
+        let windowWidth: CGFloat = expanded ? 420 : 200
+        let windowHeight: CGFloat = expanded ? notchHeight + 140 : max(notchHeight, 36)
 
-        let x = screenFrame.origin.x
+        let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
 
         NSAnimationContext.runAnimationGroup { ctx in
@@ -97,70 +93,29 @@ class NotchPlayerWindow: NSPanel {
         }
     }
 
-    private func positionFullScreenWidth() {
+    private func positionAtNotch() {
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.frame
         let notchHeight = screen.safeAreaInsets.top
-        let windowHeight = max(notchHeight, 34)
 
-        self.setFrame(
-            NSRect(x: screenFrame.origin.x, y: screenFrame.maxY - windowHeight,
-                   width: screenFrame.width, height: windowHeight),
-            display: false
-        )
+        let windowWidth: CGFloat = 200
+        let windowHeight: CGFloat = max(notchHeight, 36)
+        let x = screenFrame.midX - windowWidth / 2
+        let y = screenFrame.maxY - windowHeight
+
+        self.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: false)
     }
 
-    // MARK: - Hover Detection
-
-    private func startHoverMonitor() {
-        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
-            guard let self else { return }
-            let loc = NSEvent.mouseLocation
-            let wf = self.frame
-
-            // Expand zone: mouse near the top of screen
-            let isNearTop = loc.y > wf.origin.y - 30
-            let isInHorizontalRange = loc.x >= wf.origin.x && loc.x <= wf.maxX
-
-            if isNearTop && isInHorizontalRange {
-                if !self.expandedState {
-                    self.hoverTimer?.invalidate()
-                    self.hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: false) { [weak self] _ in
-                        DispatchQueue.main.async { self?.setExpanded(true) }
-                    }
-                }
-            } else {
-                let isFarAway = loc.y < wf.origin.y - 100 || !isInHorizontalRange
-                if isFarAway && self.expandedState {
-                    self.hoverTimer?.invalidate()
-                    self.hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { [weak self] _ in
-                        DispatchQueue.main.async { self?.setExpanded(false) }
-                    }
-                }
-            }
-        }
-    }
-
-    private func setExpanded(_ expanded: Bool) {
-        guard expandedState != expanded else { return }
-        expandedState = expanded
+    /// Toggle expanded state (called from view tap)
+    func toggleExpanded() {
+        let newState = !expandedState
+        expandedState = newState
         refreshView()
-        updateLayout(expanded: expanded)
+        updateLayout(expanded: newState)
     }
 
     override func close() {
-        if let monitor = mouseMonitor {
-            NSEvent.removeMonitor(monitor)
-            mouseMonitor = nil
-        }
-        hoverTimer?.invalidate()
-        hoverTimer = nil
         self.animations = [:]
         super.close()
-    }
-
-    deinit {
-        if let monitor = mouseMonitor { NSEvent.removeMonitor(monitor) }
-        hoverTimer?.invalidate()
     }
 }

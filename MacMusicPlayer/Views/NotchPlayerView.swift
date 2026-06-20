@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Full-width top bar with notch hidden — Dynamic Island style.
+/// Notch area overlay — click to expand, click again to collapse.
 struct NotchPlayerView: View {
     @ObservedObject var player: PlayerManager
     @Binding var isExpanded: Bool
@@ -20,121 +20,124 @@ struct NotchPlayerView: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isExpanded)
+        .onTapGesture {
+            if let panel = NSApp.windows.first(where: { $0 is NotchPlayerWindow }) as? NotchPlayerWindow {
+                panel.toggleExpanded()
+            }
+        }
     }
 
-    // MARK: - Collapsed: full-width black bar, music icon left, equalizer right
+    // MARK: - Collapsed: covers only the notch
 
     private func collapsedContent(width: CGFloat, height: CGFloat) -> some View {
-        HStack {
+        HStack(spacing: 0) {
             // Left: music icon
             if let data = artworkData, let nsImage = NSImage(data: data) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 20, height: 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
             } else {
                 Image(systemName: "music.note")
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.7))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
             }
 
             Spacer()
 
-            // Right: equalizer bars
+            // Right: equalizer
             EqualizerView()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .frame(width: width, height: height)
-        .background(Color.black)
+        .background(
+            NotchCoverShape()
+                .fill(Color.black)
+        )
     }
 
-    // MARK: - Expanded: drops down from top
+    // MARK: - Expanded: wider panel dropping down
 
     private func expandedContent(width: CGFloat, height: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Top bar (connector)
-            HStack {
+            // Top connector (same as collapsed)
+            HStack(spacing: 0) {
                 if let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 20, height: 20)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
                 } else {
                     Image(systemName: "music.note")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.7))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
                 }
-
                 Spacer()
-
                 EqualizerView()
             }
-            .padding(.horizontal, 16)
-            .frame(height: 34)
+            .padding(.horizontal, 14)
+            .frame(height: 36)
 
-            // Expanded content
-            HStack(spacing: 16) {
-                // Album art
+            // Album art + info
+            HStack(spacing: 14) {
                 if let data = artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 64, height: 64)
+                        .frame(width: 60, height: 60)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color.white.opacity(0.1))
-                        .frame(width: 64, height: 64)
-                        .overlay(Image(systemName: "music.note").font(.system(size: 24)).foregroundColor(.white.opacity(0.4)))
+                        .frame(width: 60, height: 60)
+                        .overlay(Image(systemName: "music.note").font(.system(size: 22)).foregroundColor(.white.opacity(0.4)))
                 }
 
-                // Info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(player.currentTrack?.title ?? "Not Playing")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                     Text(player.currentTrack?.artist ?? "")
-                        .font(.system(size: 13))
+                        .font(.system(size: 12))
                         .foregroundColor(.white.opacity(0.5))
                         .lineLimit(1)
                 }
-
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
+            .padding(.horizontal, 18)
+            .padding(.top, 6)
 
             // Progress bar
             VStack(spacing: 4) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.2)).frame(height: 4)
+                        RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.2)).frame(height: 3)
                         RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.8))
-                            .frame(width: geo.size.width * progressRatio, height: 4)
+                            .frame(width: geo.size.width * progressRatio, height: 3)
                     }
                 }
-                .frame(height: 4)
+                .frame(height: 3)
                 HStack {
                     Text(formatTime(player.currentTime)).font(.system(size: 10)).foregroundColor(.white.opacity(0.4))
                     Spacer()
                     Text(formatTime(player.duration)).font(.system(size: 10)).foregroundColor(.white.opacity(0.4))
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 18)
             .padding(.top, 8)
 
             // Controls
-            HStack(spacing: 36) {
+            HStack(spacing: 32) {
                 Button(action: { player.playPrevious() }) {
                     Image(systemName: "backward.fill").font(.system(size: 18)).foregroundColor(.white.opacity(0.8))
                 }.buttonStyle(.plain)
 
                 Button(action: { player.isPlaying ? player.pause() : player.play() }) {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 28)).foregroundColor(.white)
+                        .font(.system(size: 26)).foregroundColor(.white)
                 }.buttonStyle(.plain)
 
                 Button(action: { player.playNext() }) {
@@ -161,7 +164,35 @@ struct NotchPlayerView: View {
     }
 }
 
-// MARK: - Equalizer (3 bars animation)
+// MARK: - Notch Cover Shape (matches hardware notch)
+
+struct NotchCoverShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let r: CGFloat = 16
+
+        // Top edge — flat
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+
+        // Right side — round bottom-right
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r),
+                    radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: true)
+
+        // Bottom edge
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r),
+                    radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: true)
+
+        // Left side — round top-left
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+// MARK: - Equalizer Animation
 
 struct EqualizerView: View {
     @State private var animating = false
