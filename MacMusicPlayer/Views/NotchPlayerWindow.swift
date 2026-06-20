@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Panel covering only the notch area — click to expand.
+/// Panel that exactly covers the MacBook notch — click to expand.
 class NotchPlayerWindow: NSPanel {
     private let hostingView: NSHostingView<AnyView>
     private var expandedState = false
@@ -18,7 +18,7 @@ class NotchPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 36),
+            contentRect: NSRect(x: 0, y: 0, width: 185, height: 32),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -71,23 +71,18 @@ class NotchPlayerWindow: NSPanel {
         hostingView.rootView = AnyView(NotchPlayerView(player: pm, isExpanded: binding))
     }
 
-    // MARK: - Layout
-
-    /// Collapsed: covers only the notch area
-    /// Expanded: wider panel dropping down from notch
     private func updateLayout(expanded: Bool) {
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.frame
-        let notchHeight = screen.safeAreaInsets.top
 
-        let windowWidth: CGFloat = expanded ? 420 : 200
-        let windowHeight: CGFloat = expanded ? notchHeight + 140 : max(notchHeight, 36)
+        let windowWidth: CGFloat = expanded ? 400 : 185
+        let windowHeight: CGFloat = expanded ? 160 : 32
 
         let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.4
+            ctx.duration = 0.35
             ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1.0)
             self.animator().setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
         }
@@ -96,17 +91,11 @@ class NotchPlayerWindow: NSPanel {
     private func positionAtNotch() {
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.frame
-        let notchHeight = screen.safeAreaInsets.top
-
-        let windowWidth: CGFloat = 200
-        let windowHeight: CGFloat = max(notchHeight, 36)
-        let x = screenFrame.midX - windowWidth / 2
-        let y = screenFrame.maxY - windowHeight
-
-        self.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: false)
+        let x = screenFrame.midX - 185 / 2
+        let y = screenFrame.maxY - 32
+        self.setFrame(NSRect(x: x, y: y, width: 185, height: 32), display: false)
     }
 
-    /// Toggle expanded state (called from view tap)
     func toggleExpanded() {
         let newState = !expandedState
         expandedState = newState
