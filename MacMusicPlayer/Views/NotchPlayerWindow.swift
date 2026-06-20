@@ -5,7 +5,7 @@ import AppKit
 class NotchPlayerWindow: NSPanel {
     private let hostingView: NSHostingView<AnyView>
 
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
     init(playerManager: PlayerManager) {
@@ -15,8 +15,8 @@ class NotchPlayerWindow: NSPanel {
         self.hostingView = hosting
 
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 40),
-            styleMask: [.borderless],
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 44),
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -38,9 +38,11 @@ class NotchPlayerWindow: NSPanel {
             .ignoresCycle,
         ]
 
-        // Above menu bar level
-        self.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
+        // Above menu bar, below system alerts
+        self.level = .statusBar
 
+        // Set hosting view frame before assigning
+        hosting.frame = NSRect(x: 0, y: 0, width: 300, height: 44)
         hosting.autoresizingMask = [.width, .height]
         self.contentView = hosting
 
@@ -51,13 +53,11 @@ class NotchPlayerWindow: NSPanel {
     func positionAtNotch() {
         guard let screen = NSScreen.main else { return }
         guard screen.safeAreaInsets.top > 0 else {
-            // No notch — hide window
             self.orderOut(nil)
             return
         }
 
         let screenFrame = screen.frame
-        let notchHeight = screen.safeAreaInsets.top
 
         // Calculate notch width from auxiliary areas
         let leftPadding = screen.auxiliaryTopLeftArea?.width ?? 0
@@ -66,17 +66,17 @@ class NotchPlayerWindow: NSPanel {
         if leftPadding > 0 && rightPadding > 0 {
             notchWidth = screenFrame.width - leftPadding - rightPadding
         } else {
-            notchWidth = 120 // fallback
+            notchWidth = 120
         }
 
-        // Window is wider than notch for content, centered
-        let windowWidth: CGFloat = max(notchWidth + 80, 260)
-        let windowHeight: CGFloat = 40
+        // Window wider than notch for content, centered
+        let windowWidth: CGFloat = max(notchWidth + 100, 300)
+        let windowHeight: CGFloat = 44
 
         let x = screenFrame.midX - windowWidth / 2
         let y = screenFrame.maxY - windowHeight
 
-        self.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: false)
+        self.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
     }
 
     override func close() {
