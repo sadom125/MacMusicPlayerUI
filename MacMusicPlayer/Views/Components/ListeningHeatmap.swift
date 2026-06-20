@@ -16,6 +16,7 @@ struct ListeningHeatmap: View {
     @State private var lastRefreshDay: String = ""
     @State private var midnightTimer: Timer?
     @State private var dataRefreshTimer: Timer?
+    @State private var hoveredDate: String?
 
     private var primaryText: Color { themeManager.isDarkMode ? .white : .black }
     private var cardBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.05) : Color.black.opacity(0.04) }
@@ -69,9 +70,22 @@ struct ListeningHeatmap: View {
                     HStack(spacing: 6) {
                         ForEach(rows[rowIdx].indices, id: \.self) { colIdx in
                             let entry = rows[rowIdx][colIdx]
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(cellColor(for: intensityLevel(for: entry.count)))
-                                .aspectRatio(1.15, contentMode: .fit)
+                            let dateStr = Self.formatDate(entry.date)
+                            let isHovered = hoveredDate == dateStr
+
+                            HeatmapCell(
+                                count: entry.count,
+                                level: intensityLevel(for: entry.count),
+                                isHovered: isHovered,
+                                color: cellColor(for: intensityLevel(for: entry.count)),
+                                dateStr: dateStr,
+                                themeManager: themeManager
+                            )
+                            .onHover { hovering in
+                                withAnimation(.easeOut(duration: 0.15)) {
+                                    hoveredDate = hovering ? dateStr : nil
+                                }
+                            }
                         }
                     }
                 }
@@ -110,6 +124,12 @@ struct ListeningHeatmap: View {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: Date())
+    }
+
+    private static func formatDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
     }
 
     private func startMidnightTimer() {
@@ -155,5 +175,48 @@ struct ListeningHeatmap: View {
         case 4: return accent
         default: return Color.clear
         }
+    }
+}
+
+// MARK: - Heatmap Cell with Hover
+
+private struct HeatmapCell: View {
+    let count: Int
+    let level: Int
+    let isHovered: Bool
+    let color: Color
+    let dateStr: String
+    @ObservedObject var themeManager: ThemeManager
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(color)
+                .aspectRatio(1.15, contentMode: .fit)
+                .scaleEffect(isHovered ? 1.25 : 1.0)
+                .shadow(color: .black.opacity(isHovered ? 0.2 : 0), radius: isHovered ? 4 : 0)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isHovered ? (themeManager.isDarkMode ? .white.opacity(0.3) : .black.opacity(0.15)) : .clear, lineWidth: 1)
+                )
+
+            // Tooltip
+            if isHovered {
+                Text("\(dateStr): \(count) 首")
+                    .font(.system(size: 11))
+                    .foregroundColor(themeManager.isDarkMode ? .white : .black)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(themeManager.isDarkMode ? Color.white.opacity(0.9) : Color.white)
+                            .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                    )
+                    .offset(y: -32)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .zIndex(1)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 }
