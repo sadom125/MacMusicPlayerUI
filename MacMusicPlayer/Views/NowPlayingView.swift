@@ -5,8 +5,10 @@ struct NowPlayingView: View {
     let artworkData: Data?
     let lyrics: [LyricLine]
     let currentLineIndex: Int
+    let currentTime: TimeInterval  // 当前播放时间，用于逐字高亮
     var isPlaying: Bool = false
     var showRhythm: Bool = false
+    var showPlaylist: Bool = false  // 控制歌词偏移
 
     @ObservedObject var themeManager = ThemeManager.shared
 
@@ -28,6 +30,8 @@ struct NowPlayingView: View {
 
             // Right: Lyrics
             lyricsSection
+                .offset(x: showPlaylist ? -80 : 0)
+                .animation(.spring(response: 0.45, dampingFraction: 0.82), value: showPlaylist)
         }
         .padding(.leading, 80)
         .padding(.trailing, 40)
@@ -93,7 +97,7 @@ struct NowPlayingView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Lyrics
             if !lyrics.isEmpty {
-                LyricsView(lyrics: lyrics, currentLineIndex: currentLineIndex)
+                LyricsView(lyrics: lyrics, currentLineIndex: currentLineIndex, currentTime: currentTime)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // No lyrics placeholder

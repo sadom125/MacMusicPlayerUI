@@ -143,8 +143,10 @@ struct MainPlayerView: View {
                 artworkData: currentArtworkData,
                 lyrics: lyrics,
                 currentLineIndex: lastLyricIndex,
+                currentTime: player.currentTime,
                 isPlaying: player.isPlaying,
-                showRhythm: showRhythm
+                showRhythm: showRhythm,
+                showPlaylist: showPlaylist
             )
         }
     }
@@ -224,7 +226,7 @@ struct MainPlayerView: View {
         if let lrcText = try? String(contentsOf: lrcURL, encoding: .utf8) {
             let parsed = LrcParser.parse(lrcText: lrcText)
             if !parsed.isEmpty {
-                lyrics = parsed
+                lyrics = LrcParser.assignWordsToLines(parsed)
                 updateLyricIndex(time: player.currentTime)
                 return
             }
@@ -234,7 +236,7 @@ struct MainPlayerView: View {
         if let lrcText = track.lyrics, !lrcText.isEmpty {
             let parsed = LrcParser.parse(lrcText: lrcText)
             if !parsed.isEmpty {
-                lyrics = parsed
+                lyrics = LrcParser.assignWordsToLines(parsed)
                 updateLyricIndex(time: player.currentTime)
                 return
             }
@@ -244,7 +246,7 @@ struct MainPlayerView: View {
         if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
             let parsed = LrcParser.parse(lrcText: lrcText)
             if !parsed.isEmpty {
-                lyrics = parsed
+                lyrics = LrcParser.assignWordsToLines(parsed)
                 updateLyricIndex(time: player.currentTime)
                 return
             }
