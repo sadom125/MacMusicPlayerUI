@@ -1,0 +1,52 @@
+# Xcode
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+
+# Swift Package Manager
+.build/
+Package.resolved
+
+# macOS
+.DS_Store
+Icon?
+._*
+
+# Editor
+*.swp
+*.swo
+*~
+*.lock
+~$*
+
+# Build products
+build/
+*.app
+*.framework
+
+# CocoaPods (if any)
+Podfile.lock
+
+# Carthage (if any)
+Carthage/
+
+# fastlane (if any)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Crash logs
+*.crash
+
+# Signing
+*.mobileprovision
+*.provisionprofile
+todo.md
+CLAUDE.md
+Untitled.md
