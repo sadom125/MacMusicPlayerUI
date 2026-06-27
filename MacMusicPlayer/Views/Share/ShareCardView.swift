@@ -98,7 +98,7 @@ struct ShareCardView: View {
                 // Bottom: Branding
                 HStack {
                     Spacer()
-                    Text("LX Music")
+                    Text("MacMusicPlayer")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white.opacity(0.3))
                         .tracking(2)

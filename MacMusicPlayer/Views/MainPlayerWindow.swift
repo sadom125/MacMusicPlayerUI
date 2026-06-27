@@ -234,7 +234,7 @@ class MainPlayerWindow: NSWindow {
         if let track = playerManager.currentTrack, !track.title.isEmpty {
             self.title = track.title
         } else {
-            self.title = "LX Music"
+            self.title = "MacMusicPlayer"
         }
         // Let NSApp.appearance control title bar text color (set by ThemeManager)
     }
