@@ -156,7 +156,7 @@ class PlayerManager: NSObject, ObservableObject {
     }
 
     private func setupTimeObserver() {
-        let interval = CMTime(seconds: 0.1, preferredTimescale: 10)
+        let interval = CMTime(seconds: 0.25, preferredTimescale: 40)
         timeObserver = queueController.queuePlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
 

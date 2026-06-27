@@ -116,35 +116,24 @@ struct LyricLineView: View {
     }
 
     /// 计算每个字的透明度 — 当前字最亮，前后渐变
+    /// Optimized: uses estimated per-character duration derived from the next word's
+    /// time offset, falling back to a fixed 0.4s per character when next-word info is
+    /// unavailable. Avoids repeated next-word array lookups.
     private func wordOpacity(word: LyricWord, at index: Int, in words: [LyricWord], with time: TimeInterval) -> Double {
-        guard index < words.count else { return 0.3 }
+        let timeDiff = time - word.time
 
-        let currentWord = words[index]
-        let timeDiff = time - currentWord.time
+        // Not yet reached this word
+        if timeDiff < 0 { return 0.3 }
 
-        // 还没唱到的字
-        if timeDiff < 0 {
-            if index > 0 {
-                let prevWord = words[index - 1]
-                let prevDiff = time - prevWord.time
-                let transitionDuration = currentWord.time - prevWord.time
-                if transitionDuration > 0 && prevDiff >= 0 {
-                    return min(prevDiff / transitionDuration, 1.0) * 0.7 + 0.3
-                }
-            }
-            return 0.3
-        }
-
-        // 找到下一个字的时间
-        let nextTime: TimeInterval
-        if index < words.count - 1 {
-            nextTime = words[index + 1].time
+        // Estimate per-character duration: use next word's offset or default 0.4s
+        let duration: TimeInterval
+        if index + 1 < words.count {
+            duration = max(words[index + 1].time - word.time, 0.05)
         } else {
-            nextTime = currentWord.time + 0.5
+            duration = 0.4
         }
-        let duration = nextTime - currentWord.time
 
-        if duration > 0 && timeDiff < duration {
+        if timeDiff < duration {
             let progress = timeDiff / duration
             return 0.3 + 0.7 * (1.0 - progress * 0.3)
         }
@@ -153,50 +142,25 @@ struct LyricLineView: View {
     }
 
     /// 计算每个字的缩放 — 当前字稍微放大
+    /// Optimized: uses estimated per-character duration, avoiding backward-scan.
     private func wordScale(word: LyricWord, at index: Int, in words: [LyricWord], with time: TimeInterval) -> CGFloat {
-        guard index < words.count else { return 1.0 }
+        let timeDiff = time - word.time
 
-        let currentWord = words[index]
-        let timeDiff = time - currentWord.time
+        if timeDiff < 0 { return 1.0 }
 
-        if timeDiff < 0 {
-            if index > 0 {
-                let prevWord = words[index - 1]
-                let prevDiff = time - prevWord.time
-                let transitionDuration = currentWord.time - prevWord.time
-                if transitionDuration > 0 && prevDiff >= 0 {
-                    let t = min(prevDiff / transitionDuration, 1.0)
-                    return 1.0 + t * 0.05
-                }
-            }
-            return 1.0
-        }
-
-        let nextTime: TimeInterval
-        if index < words.count - 1 {
-            nextTime = words[index + 1].time
+        let duration: TimeInterval
+        if index + 1 < words.count {
+            duration = max(words[index + 1].time - word.time, 0.05)
         } else {
-            nextTime = currentWord.time + 0.5
+            duration = 0.4
         }
-        let duration = nextTime - currentWord.time
 
-        if duration > 0 && timeDiff < duration {
+        if timeDiff < duration {
             let progress = timeDiff / duration
             return 1.05 - progress * 0.03
         }
 
         return 1.0
-    }
-
-    /// 判断某个字是否应该高亮
-    private func isWordHighlighted(word: LyricWord, at index: Int, in words: [LyricWord]) -> Bool {
-        // 如果是最后一个字，只要当前时间 >= 字的时间就高亮
-        if index == words.count - 1 {
-            return currentTime >= word.time
-        }
-        // 否则，当前时间在这个字和下一个字之间就高亮
-        let nextWord = words[index + 1]
-        return currentTime >= word.time && currentTime < nextWord.time
     }
 
     private var foreground: Color {
@@ -206,14 +170,6 @@ struct LyricLineView: View {
         case .near:   return isDark ? .white.opacity(0.6) : .black.opacity(0.6)
         case .far:    return isDark ? .white.opacity(0.25) : .black.opacity(0.25)
         }
-    }
-
-    private var wordActiveColor: Color {
-        themeManager.isDarkMode ? .white : .black
-    }
-
-    private var wordInactiveColor: Color {
-        themeManager.isDarkMode ? .white.opacity(0.4) : .black.opacity(0.4)
     }
 }
 

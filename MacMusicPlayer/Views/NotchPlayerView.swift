@@ -180,22 +180,22 @@ class EqualizerState: ObservableObject {
     func startTimer() {
         stopTimer()
         let source = DispatchSource.makeTimerSource(queue: .main)
-        source.schedule(deadline: .now(), repeating: .milliseconds(100))
+        // Reduced from 100ms to 150ms — still smooth at this visual rate
+        source.schedule(deadline: .now(), repeating: .milliseconds(150))
         source.setEventHandler { [weak self] in
             guard let self = self else { return }
-            if self.isPlaying {
-                self.tick += 0.1
-                let newBars = (0..<4).map { i in
-                    let phase = self.tick + Double(i) * 0.7
-                    let wave1 = sin(phase * 3.0) * 0.4
-                    let wave2 = sin(phase * 1.8 + 1.2) * 0.3
-                    let noise = Double.random(in: -0.1...0.1)
-                    let combined = 0.5 + wave1 + wave2 + noise
-                    let h = 4 + combined * 10
-                    return CGFloat(max(3, min(16, h)))
-                }
-                self.bars = newBars
+            guard self.isPlaying else { return }
+            self.tick += 0.15
+            let newBars = (0..<4).map { i in
+                let phase = self.tick + Double(i) * 0.7
+                let wave1 = sin(phase * 3.0) * 0.4
+                let wave2 = sin(phase * 1.8 + 1.2) * 0.3
+                let noise = Double.random(in: -0.1...0.1)
+                let combined = 0.5 + wave1 + wave2 + noise
+                let h = 4 + combined * 10
+                return CGFloat(max(3, min(16, h)))
             }
+            self.bars = newBars
         }
         objc_setAssociatedObject(self, &Self.timerKey, source, .OBJC_ASSOCIATION_RETAIN)
         source.resume()

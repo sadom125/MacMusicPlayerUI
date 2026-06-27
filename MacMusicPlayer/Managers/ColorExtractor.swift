@@ -9,7 +9,6 @@ class ColorExtractor {
     private var cache: [UUID: Color] = [:]
     private var accessOrder: [UUID] = []
     private let maxCacheSize = 100
-    private let ciContext = CIContext()
 
     private init() {
         // Clear cache when playlist changes (old track IDs are no longer relevant)

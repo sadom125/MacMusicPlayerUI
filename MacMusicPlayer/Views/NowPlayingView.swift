@@ -74,7 +74,7 @@ struct NowPlayingView: View {
             // stays at the last angle instead of snapping back to 0°.
             if let data = artworkData, let nsImage = NSImage(data: data) {
                 if isPlaying {
-                    TimelineView(.periodic(from: .now, by: 1.0 / 60.0)) { context in
+                    TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { context in
                         let elapsed = context.date.timeIntervalSince(self.rotationStartTime)
                         let angle = (elapsed.truncatingRemainder(dividingBy: 8.0) / 8.0) * 360.0
 
@@ -154,12 +154,12 @@ class RhythmState: ObservableObject {
     func startTimer() {
         stopTimer()
         let source = DispatchSource.makeTimerSource(queue: .main)
-        source.schedule(deadline: .now(), repeating: .milliseconds(110))
+        // Reduce tick rate when playing: every 150ms is sufficient for this visual effect
+        source.schedule(deadline: .now(), repeating: .milliseconds(150))
         source.setEventHandler { [weak self] in
             guard let self = self else { return }
-            if self.isPlaying {
-                self.bars = (0..<18).map { _ in CGFloat.random(in: 6...42) }
-            }
+            guard self.isPlaying else { return }
+            self.bars = (0..<18).map { _ in CGFloat.random(in: 6...42) }
         }
         objc_setAssociatedObject(self, &Self.timerKey, source, .OBJC_ASSOCIATION_RETAIN)
         source.resume()
@@ -195,11 +195,16 @@ struct MusicRhythmView: View {
         .frame(width: 320, height: 50)
         .onAppear {
             state.isPlaying = isPlaying
-            state.startTimer()
+            if isPlaying {
+                state.startTimer()
+            }
         }
         .onChange(of: isPlaying) { v in
             state.isPlaying = v
-            if !v {
+            if v {
+                state.startTimer()
+            } else {
+                state.stopTimer()
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                     state.bars = Array(repeating: 6, count: 18)
                 }

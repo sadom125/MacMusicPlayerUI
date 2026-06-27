@@ -7,6 +7,8 @@ struct MainPlayerView: View {
     @ObservedObject var themeManager = ThemeManager.shared
     @State private var lyrics: [LyricLine] = []
     @State private var lastLyricIndex: Int = -1
+    /// Throttle lyric index updates to once per second instead of every 100ms
+    @State private var lastLyricUpdateSecond: Int = -1
     @State private var artworkFallbackCache: [UUID: Data?] = [:]
     @AppStorage("bgMode") private var bgMode: String = "albumArt"
     @AppStorage("showPlaylist") private var showPlaylist: Bool = false
@@ -166,7 +168,12 @@ struct MainPlayerView: View {
             }
         }
         .onChange(of: player.currentTime) { newTime in
-            updateLyricIndex(time: newTime)
+            // Throttle: only update lyric index when integer second changes
+            let wholeSecond = Int(newTime)
+            if wholeSecond != lastLyricUpdateSecond {
+                lastLyricUpdateSecond = wholeSecond
+                updateLyricIndex(time: newTime)
+            }
         }
     }
 
@@ -326,19 +333,24 @@ struct MainPlayerView: View {
 
     private func updateLyricIndex(time: TimeInterval) {
         guard !lyrics.isEmpty else {
-            if lastLyricIndex != -1 { lastLyricIndex = -1 }
+            lastLyricIndex = -1
             return
         }
         // Guard against stale lastLyricIndex when lyrics array shrinks (e.g. track change)
         if lastLyricIndex >= lyrics.count { lastLyricIndex = -1 }
 
-        // Find the last lyric line whose time <= current time (linear scan from start)
+        // Binary search: find the last lyric line whose time <= current time
+        // lyrics are sorted by time (LrcParser sorts them), so O(log n) instead of O(n)
+        var lo = 0
+        var hi = lyrics.count - 1
         var idx = -1
-        for i in 0..<lyrics.count {
-            if lyrics[i].time <= time {
-                idx = i
+        while lo <= hi {
+            let mid = (lo + hi) / 2
+            if lyrics[mid].time <= time {
+                idx = mid
+                lo = mid + 1
             } else {
-                break
+                hi = mid - 1
             }
         }
 

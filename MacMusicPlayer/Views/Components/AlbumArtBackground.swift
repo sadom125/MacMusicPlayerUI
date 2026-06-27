@@ -90,13 +90,14 @@ struct AlbumArtBackground: View {
         .animation(.easeInOut(duration: 0.5), value: trackID)
         .animation(.easeInOut(duration: 0.3), value: themeManager.isDarkMode)
         .onAppear {
-            // Only breathe when there's artwork to glow
-            if artworkData != nil && useDynamicGradient {
-                withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) {
-                    breathe = true
-                }
-            }
+            updateBreatheAnimation()
             extractDominantColor()
+        }
+        .onChange(of: isAnimating) { _ in
+            updateBreatheAnimation()
+        }
+        .onChange(of: artworkData != nil) { _ in
+            updateBreatheAnimation()
         }
         .onChange(of: trackID) { _ in
             extractDominantColor()
@@ -146,6 +147,18 @@ struct AlbumArtBackground: View {
                 Color.white.opacity(0.04),
                 Color.clear,
             ]
+        }
+    }
+
+    /// Start/stop the breathing glow animation based on playback state.
+    /// Keeps the animation paused when not playing to save GPU cycles.
+    private func updateBreatheAnimation() {
+        // Reset breathe state each time
+        breathe = false
+        if isAnimating, artworkData != nil, useDynamicGradient {
+            withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) {
+                breathe = true
+            }
         }
     }
 
