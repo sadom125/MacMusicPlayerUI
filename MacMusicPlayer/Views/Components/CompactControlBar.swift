@@ -89,10 +89,14 @@ struct CompactControlBar: View {
                 .buttonStyle(.plain)
                 .help("点赞")
                 .background(
-                    LikeBurstAnimation()
-                        .id(likeBurstCount)
-                        .offset(y: -20)
-                        .frame(width: 200, height: 200, alignment: .center),
+                    Group {
+                        if likeBurstCount > 0 {
+                            LikeBurstAnimation()
+                                .id(likeBurstCount)
+                                .offset(y: -20)
+                                .frame(width: 200, height: 200, alignment: .center)
+                        }
+                    },
                     alignment: .center
                 )
             }
@@ -157,10 +161,14 @@ struct CompactControlBar: View {
                 .buttonStyle(.plain)
                 .help(isFavorited ? "取消收藏" : "收藏")
                 .background(
-                    StarBurstAnimation()
-                        .id(starBurstCount)
-                        .offset(y: -20)
-                        .frame(width: 200, height: 200, alignment: .center),
+                    Group {
+                        if starBurstCount > 0 {
+                            StarBurstAnimation()
+                                .id(starBurstCount)
+                                .offset(y: -20)
+                                .frame(width: 200, height: 200, alignment: .center)
+                        }
+                    },
                     alignment: .center
                 )
             }

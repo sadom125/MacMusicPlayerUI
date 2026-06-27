@@ -12,6 +12,11 @@ struct NowPlayingView: View {
 
     @ObservedObject var themeManager = ThemeManager.shared
 
+    /// 暂停时记录最后一次旋转角度，避免跳回 0°
+    @State private var pauseAngle: Double = 0
+    /// 播放时的旋转起始时间，用于「暂停→恢复」时无缝衔接角度
+    @State private var rotationStartTime: Date = Date()
+
     private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.3) : Color.black.opacity(0.3) }
     private var placeholderBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.1) : Color.black.opacity(0.08) }
 
@@ -36,6 +41,15 @@ struct NowPlayingView: View {
         .padding(.leading, 80)
         .padding(.trailing, 40)
         .padding(.vertical, 40)
+        .onChange(of: isPlaying) { newValue in
+            if newValue {
+                // Resuming: offset rotationStartTime so the angle continues
+                // from pauseAngle rather than restarting from 0°.
+                // Map pauseAngle → elapsed seconds → offset the start time.
+                let elapsedSec = (pauseAngle / 360.0) * 8.0
+                rotationStartTime = Date().addingTimeInterval(-elapsedSec)
+            }
+        }
     }
 
     // MARK: - Vinyl Record
@@ -56,18 +70,33 @@ struct NowPlayingView: View {
             }
 
             // Album art (center disc, rotating via TimelineView)
+            // @State pauseAngle freezes the rotation when paused so the disc
+            // stays at the last angle instead of snapping back to 0°.
             if let data = artworkData, let nsImage = NSImage(data: data) {
-                TimelineView(.periodic(from: .now, by: 1.0 / 60.0)) { context in
-                    let elapsed = context.date.timeIntervalSinceReferenceDate
-                    let angle = isPlaying ? (elapsed.truncatingRemainder(dividingBy: 8.0) / 8.0) * 360.0 : 0
+                if isPlaying {
+                    TimelineView(.periodic(from: .now, by: 1.0 / 60.0)) { context in
+                        let elapsed = context.date.timeIntervalSince(self.rotationStartTime)
+                        let angle = (elapsed.truncatingRemainder(dividingBy: 8.0) / 8.0) * 360.0
 
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 180, height: 180)
+                            .clipShape(Circle())
+                            .rotationEffect(.degrees(angle))
+                            .onChange(of: angle) { newAngle in
+                                pauseAngle = newAngle
+                            }
+                    }
+                } else {
                     Image(nsImage: nsImage)
                         .resizable()
                         .interpolation(.high)
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 180, height: 180)
                         .clipShape(Circle())
-                        .rotationEffect(.degrees(angle))
+                        .rotationEffect(.degrees(pauseAngle))
                 }
             } else {
                 // Placeholder

@@ -20,6 +20,9 @@ extension Notification.Name {
     // MARK: - Config
     static let configUpdated = Notification.Name("ConfigUpdated")
 
+    // MARK: - Metadata Editor
+    static let trackMetadataEdited = Notification.Name("TrackMetadataEdited")
+
     // MARK: - Window
     static let windowWillZoom = Notification.Name("MainPlayerWindowWillZoom")
     static let windowDidZoom = Notification.Name("MainPlayerWindowDidZoom")

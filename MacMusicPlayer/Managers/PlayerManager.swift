@@ -16,6 +16,7 @@ class PlayerManager: NSObject, ObservableObject {
             NotificationCenter.default.post(name: .playbackStateChanged, object: nil)
         }
     }
+    @Published var isLoading = false
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
 
@@ -236,114 +237,125 @@ class PlayerManager: NSObject, ObservableObject {
         currentIndex = 0
 
         playlist = []
+        isLoading = true
 
         loadTracksFromMusicFolder(URL(fileURLWithPath: library.path))
     }
 
     func loadTracksFromMusicFolder(_ folderURL: URL) {
-        let fileManager = FileManager.default
+        // Run heavy file enumeration + parsing on a background queue so the window
+        // can appear immediately instead of blocking the main thread at launch.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
 
-        guard let enumerator = fileManager.enumerator(at: folderURL,
-                                                    includingPropertiesForKeys: [.isRegularFileKey],
-                                                    options: [.skipsHiddenFiles, .skipsPackageDescendants]) else {
-            print("Failed to enumerate folder contents")
-            return
-        }
+            let fileManager = FileManager.default
 
-        var newPlaylist: [Track] = []
-
-        for case let fileURL as URL in enumerator {
-            if isAudioFile(fileURL) {
-                let fileName = fileURL.deletingPathExtension().lastPathComponent
-
-                var title = fileName
-                var artist = NSLocalizedString("Unknown Artist", comment: "Default artist name when parsing filenames")
-
-                // Support both "歌名 - 歌手" and "歌名-歌手" formats
-                if let range = fileName.range(of: " - ") {
-                    title = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
-                    artist = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-                } else if let range = fileName.range(of: "-") {
-                    title = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
-                    artist = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-                }
-
-                let track = Track(
-                    id: UUID(),
-                    title: title,
-                    artist: artist,
-                    album: NSLocalizedString("Unknown Album", comment: "Default album name"),
-                    albumArtData: nil,
-                    duration: 0,
-                    url: fileURL,
-                    lyrics: nil
-                )
-                newPlaylist.append(track)
+            guard let enumerator = fileManager.enumerator(at: folderURL,
+                                                        includingPropertiesForKeys: [.isRegularFileKey],
+                                                        options: [.skipsHiddenFiles, .skipsPackageDescendants]) else {
+                print("Failed to enumerate folder contents")
+                DispatchQueue.main.async { self.isLoading = false }
+                return
             }
-        }
 
-        // Kick off async metadata parsing in background — limit to 8 concurrent tasks
-        let semaphore = AsyncSemaphore(limit: 8)
-        for track in newPlaylist {
-            let capturedURL = track.url
-            let capturedTrack = track
-            metadataTasks[track.id] = Task { [weak self] in
-                guard let self else { return }
-                await semaphore.wait()
-                guard let meta = await MetadataParser.parse(from: capturedURL) else {
+            var newPlaylist: [Track] = []
+
+            for case let fileURL as URL in enumerator {
+                if self.isAudioFile(fileURL) {
+                    let fileName = fileURL.deletingPathExtension().lastPathComponent
+
+                    var title = fileName
+                    var artist = NSLocalizedString("Unknown Artist", comment: "Default artist name when parsing filenames")
+
+                    // Support both "歌名 - 歌手" and "歌名-歌手" formats
+                    if let range = fileName.range(of: " - ") {
+                        title = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        artist = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    } else if let range = fileName.range(of: "-") {
+                        title = String(fileName[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        artist = String(fileName[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                    }
+
+                    let track = Track(
+                        id: UUID(),
+                        title: title,
+                        artist: artist,
+                        album: NSLocalizedString("Unknown Album", comment: "Default album name"),
+                        albumArtData: nil,
+                        duration: 0,
+                        url: fileURL,
+                        lyrics: nil
+                    )
+                    newPlaylist.append(track)
+                }
+            }
+
+            // Kick off async metadata parsing in background — limit to 8 concurrent tasks
+            let semaphore = AsyncSemaphore(limit: 8)
+            for track in newPlaylist {
+                let capturedURL = track.url
+                let capturedTrack = track
+                // Use .background priority so metadata parsing doesn't compete with
+                // the 60fps disc rotation animation or other UI work.
+                self.metadataTasks[track.id] = Task(priority: .background) { [weak self] in
+                    guard let self else { return }
+                    await semaphore.wait()
+                    guard let meta = await MetadataParser.parse(from: capturedURL) else {
+                        await semaphore.signal()
+                        return
+                    }
                     await semaphore.signal()
-                    return
+                    self.updateTrackDirect(capturedTrack, with: meta)
                 }
-                await semaphore.signal()
-                self.updateTrackDirect(capturedTrack, with: meta)
-            }
-        }
-
-        // Parse first track's artwork & lyrics synchronously so UI has data immediately
-        if var firstTrack = newPlaylist.first {
-            let artwork = MetadataParser.parseArtworkDirect(from: firstTrack.url)
-            let lyrics = MetadataParser.parseLyricsDirect(from: firstTrack.url)
-            if artwork != nil || lyrics != nil {
-                firstTrack = Track(
-                    id: firstTrack.id,
-                    title: firstTrack.title,
-                    artist: firstTrack.artist,
-                    album: firstTrack.album,
-                    albumArtData: artwork,
-                    duration: firstTrack.duration,
-                    url: firstTrack.url,
-                    lyrics: lyrics
-                )
-                newPlaylist[0] = firstTrack
-            }
-        }
-
-        DispatchQueue.main.async {
-            let sortedTracks = newPlaylist.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-
-            self.playlistStore.setTracks(sortedTracks)
-
-            self.playlist = sortedTracks
-
-            if !sortedTracks.isEmpty {
-                self.currentIndex = 0
-                self.currentTrack = sortedTracks[0]
-                self.duration = sortedTracks[0].duration > 0 ? sortedTracks[0].duration : 0
-                self.playlistStore.setCurrentIndex(0)
-                self.queueController.setQueue(sortedTracks, startingAt: 0)
-            } else {
-                self.currentTrack = nil
-                self.currentIndex = 0
-                self.duration = 0
             }
 
-            NotificationCenter.default.post(name: .playlistUpdated, object: nil)
+            // Parse first track's artwork & lyrics synchronously so UI has data immediately
+            if var firstTrack = newPlaylist.first {
+                let artwork = MetadataParser.parseArtworkDirect(from: firstTrack.url)
+                let lyrics = MetadataParser.parseLyricsDirect(from: firstTrack.url)
+                if artwork != nil || lyrics != nil {
+                    firstTrack = Track(
+                        id: firstTrack.id,
+                        title: firstTrack.title,
+                        artist: firstTrack.artist,
+                        album: firstTrack.album,
+                        albumArtData: artwork,
+                        duration: firstTrack.duration,
+                        url: firstTrack.url,
+                        lyrics: lyrics
+                    )
+                    newPlaylist[0] = firstTrack
+                }
+            }
 
-            // Restore last playback position
-            self.restorePlaybackPosition()
+            DispatchQueue.main.async {
+                let sortedTracks = newPlaylist.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
-            // Start file system watcher after loading
-            self.startFileSystemWatcher(for: folderURL)
+                self.playlistStore.setTracks(sortedTracks)
+
+                self.playlist = sortedTracks
+                self.isLoading = false
+
+                if !sortedTracks.isEmpty {
+                    self.currentIndex = 0
+                    self.currentTrack = sortedTracks[0]
+                    self.duration = sortedTracks[0].duration > 0 ? sortedTracks[0].duration : 0
+                    self.playlistStore.setCurrentIndex(0)
+                    self.queueController.setQueue(sortedTracks, startingAt: 0)
+                } else {
+                    self.currentTrack = nil
+                    self.currentIndex = 0
+                    self.duration = 0
+                }
+
+                NotificationCenter.default.post(name: .playlistUpdated, object: nil)
+
+                // Restore last playback position
+                self.restorePlaybackPosition()
+
+                // Start file system watcher after loading
+                self.startFileSystemWatcher(for: folderURL)
+            }
         }
     }
 

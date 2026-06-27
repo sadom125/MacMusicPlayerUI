@@ -79,6 +79,18 @@ struct MainPlayerView: View {
                 }
             }
 
+            // Loading Overlay (shown during first launch track scanning)
+            if player.isLoading && player.playlist.isEmpty {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("正在加载音乐库...")
+                        .font(.system(size: 14))
+                        .foregroundColor(themeManager.isDarkMode ? .white.opacity(0.6) : .black.opacity(0.6))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
             // View Mode Selector (left side, vertically centered)
             viewModeSelector
         }
@@ -174,7 +186,10 @@ struct MainPlayerView: View {
                 showRhythm: showRhythm,
                 showPlaylist: showPlaylist
             )
-            .opacity(viewMode == "home" ? 0 : 1)
+            .opacity(viewMode == "home" ? 0 : viewMode == "nowPlaying" ? 1 : 0)
+
+            TrackEditorView(player: player)
+                .opacity(viewMode == "editor" ? 1 : 0)
         }
     }
 
@@ -206,6 +221,20 @@ struct MainPlayerView: View {
                     .frame(width: 36, height: 36)
                     .background(
                         viewMode == "nowPlaying"
+                            ? themeManager.accent.opacity(0.15)
+                            : inactiveBg
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+
+            Button(action: { viewMode = "editor" }) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 16))
+                    .foregroundColor(viewMode == "editor" ? themeManager.accent : inactiveIconColor)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        viewMode == "editor"
                             ? themeManager.accent.opacity(0.15)
                             : inactiveBg
                     )
