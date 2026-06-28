@@ -322,36 +322,34 @@ ZStack {
 }
 ```
 
-### 13. onContinuousHover 仅 macOS 13+ ❌
+### 13. onContinuousHover 仅 macOS 13+ + NSTrackingArea 导致抖动 ❌❌
 
-**问题：** `onContinuousHover(coordinateSpace:perform:)` 是 macOS 13+ API，项目 target macOS 12.0，编译报错。
+**问题（两次踩坑）：** 最初尝试 `onContinuousHover`（macOS 13+，项目 target 12.0 → 编译错误）。改用 `NSViewRepresentable` + `NSTrackingArea` 后，`mouseMoved` 在 ~60fps 下持续触发 tilt 值更新，导致 SwiftUI 每帧重建 `rotation3DEffect`，与内部的 TimelineView（20fps 唱片旋转）渲染冲突 → 唱片异常抖动。
 
-**正确方案：** 用 `NSViewRepresentable` + `NSTrackingArea` 实现坐标追踪：
+**最终正确方案：** 彻底放弃鼠标跟踪，用 SwiftUI 内置的 `.repeatForever` 自动摆动：
 ```swift
-struct HoverPositionReporter: NSViewRepresentable {
-    let onHover: (CGPoint?) -> Void
-    func makeNSView(context: Context) -> NSView {
-        let view = TrackingNSView()
-        view.onHover = onHover
-        return view
+@State private var discTiltPhaseX: Bool = false
+@State private var discTiltPhaseY: Bool = false
+
+.onAppear {
+    withAnimation(.easeInOut(duration: 5).repeatForever(autoreverses: true)) {
+        discTiltPhaseX = true
     }
-    func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView as? TrackingNSView)?.onHover = onHover
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
+        withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+            discTiltPhaseY = true
+        }
     }
 }
-fileprivate class TrackingNSView: NSView {
-    var onHover: ((CGPoint?) -> Void)?
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        trackingAreas.forEach { removeTrackingArea($0) }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInActiveApp, .inVisibleRect, .mouseEnteredAndExited], owner: self)
-        addTrackingArea(area)
-    }
-    override func mouseMoved(with event: NSEvent) { onHover?(convert(event.locationInWindow, from: nil)) }
-    override func mouseExited(with event: NSEvent) { onHover?(nil) }
-}
+
+// 在 vinylSection 中:
+let tiltX: Double = (discTiltPhaseX ? 2.0 : -2.0)  // 映射到 ±2°
+let tiltY: Double = (discTiltPhaseY ? 1.5 : -1.5)  // 映射到 ±1.5°
+// 然后用 rotation3DEffect，无需 .animation() modifier
 ```
-使用方式：`.background(HoverPositionReporter(onHover: { point in ... }))`。
+**原理：** `.repeatForever` 是 GPU 动画合成器驱动的，不占用 CPU 也不触发 SwiftUI body 重建。两个独立相位（5s/4s + 1.25s 偏移）产生 Lissajous 式摆动，视觉上像是真实唱片在转盘上微晃。
+
+**教训：** 任何需要高频（>10fps）更新 @State 的方案都会导致 SwiftUI 持续重建 → 动画抖动。如果 3D 效果不需要与鼠标位置关联，优先用 `.repeatForever` 这种 GPU 级动画。
 
 ### 14. [UUID: Data?] 缓存无限增长 ❌
 
