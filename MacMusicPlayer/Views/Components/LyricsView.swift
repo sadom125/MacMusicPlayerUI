@@ -1,35 +1,38 @@
 import SwiftUI
 
-/// Centered, immersive lyrics display.
-/// Active line is highlighted with larger font and breathing glow.
-/// Past lines fade to near-invisible.
-/// Supports word-level highlighting when word timestamps are available.
+/// Centered lyrics display — no 3D transforms, no compositing layers.
+/// Depth achieved purely with font size + opacity for maximum performance.
+/// Word-level highlighting on the active line when timestamps are available.
 struct LyricsView: View {
     let lyrics: [LyricLine]
     let currentLineIndex: Int
-    let currentTime: TimeInterval  // 当前播放时间，用于逐字高亮
+    let currentTime: TimeInterval
     var isPlaying: Bool = false
+
+    @ObservedObject var themeManager = ThemeManager.shared
+    /// Track last scroll index to detect large jumps (skip animation)
+    @State private var lastScrollLineIndex: Int = -1
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 12) {
-                    // Top spacer so active line can be centered
+                LazyVStack(spacing: 12) {
                     Color.clear.frame(height: 100)
 
                     ForEach(Array(lyrics.enumerated()), id: \.element.id) { index, line in
                         LyricLineView(
                             line: line,
                             isActive: index == currentLineIndex,
-                            proximity: proximity(index),
-                            currentTime: currentTime,
-                            isPlaying: isPlaying
+                            isNear: currentLineIndex >= 0 && abs(index - currentLineIndex) <= 2,
+                            currentTime: index == currentLineIndex ? currentTime : -1,
+                            isPlaying: isPlaying,
+                            isDarkMode: themeManager.isDarkMode
                         )
+                        .equatable()
                         .id(index)
                         .frame(maxWidth: .infinity)
                     }
 
-                    // Bottom spacer
                     Color.clear.frame(height: 100)
                 }
             }
@@ -45,92 +48,89 @@ struct LyricsView: View {
                     endPoint: .bottom
                 )
             )
+            // Scroll to initial position when view first appears (safety net for
+            // track changes where .onChange doesn't fire for the initial value).
+            .onAppear {
+                if currentLineIndex >= 0 {
+                    lastScrollLineIndex = currentLineIndex
+                    proxy.scrollTo(currentLineIndex, anchor: .center)
+                }
+            }
             .onChange(of: currentLineIndex) { newIndex in
                 guard newIndex >= 0 else { return }
-                withAnimation(.easeOut(duration: 0.12)) {
+                let prev = lastScrollLineIndex >= 0 ? lastScrollLineIndex : newIndex
+                lastScrollLineIndex = newIndex
+
+                // Only animate small jumps (< 3 lines). Large jumps (track change,
+                // manual seek) scroll immediately to avoid long animation churn.
+                if abs(newIndex - prev) <= 3 {
+                    withAnimation(.easeOut(duration: 0.08)) {
+                        proxy.scrollTo(newIndex, anchor: .center)
+                    }
+                } else {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }
             }
         }
     }
-
-    private func proximity(_ index: Int) -> Proximity {
-        let diff = index - currentLineIndex
-        if currentLineIndex < 0 { return .far }
-        if diff == 0 { return .active }
-        if abs(diff) <= 2 { return .near }
-        return .far
-    }
-
-    enum Proximity { case active, near, far }
 }
 
-/// Individual lyric line with pre-computed style, avoids full ForEach re-evaluation.
-/// Supports word-level highlighting when word timestamps are available.
-struct LyricLineView: View {
+/// Individual lyric line — no 3D transforms, no extra compositing layers.
+/// Uses font size + opacity for depth. Receives isDarkMode directly instead
+/// of observing ThemeManager (avoids per-line ObservableObject subscription).
+struct LyricLineView: View, Equatable {
     let line: LyricLine
     let isActive: Bool
-    let proximity: LyricsView.Proximity
+    let isNear: Bool
     let currentTime: TimeInterval
     var isPlaying: Bool = false
-
-    @State private var breathe: Bool = false
-    @ObservedObject var themeManager = ThemeManager.shared
+    let isDarkMode: Bool
 
     /// When paused, return the "display" time for the current line (last word time)
-    /// so the lyrics render at the final sung position instead of recomputing every frame.
     private var displayTime: TimeInterval {
-        isPlaying ? currentTime : (line.words.last?.time ?? currentTime)
+        guard currentTime >= 0 else { return -1 }
+        return isPlaying ? currentTime : (line.words.last?.time ?? currentTime)
+    }
+
+    static func == (lhs: LyricLineView, rhs: LyricLineView) -> Bool {
+        guard lhs.line.id == rhs.line.id,
+              lhs.isActive == rhs.isActive,
+              lhs.isNear == rhs.isNear,
+              lhs.isPlaying == rhs.isPlaying,
+              lhs.isDarkMode == rhs.isDarkMode else {
+            return false
+        }
+        // Only active line needs time-based re-evaluation (word highlighting)
+        if lhs.isActive && lhs.currentTime != rhs.currentTime {
+            return false
+        }
+        return true
     }
 
     var body: some View {
-        // Use word-level highlighting if words are available, otherwise fall back to line-level
-        let rotation = depthRotation
-        return Group {
-            if isActive && !line.words.isEmpty {
-                wordHighlightedText
-                    .rotation3DEffect(.degrees(0), axis: (0, 1, 0))
-            } else {
-                Text(line.text)
-                    .font(isActive ? .system(size: 22, weight: .semibold) : .system(size: 16))
-                    .foregroundColor(foreground)
-                    .lineSpacing(12)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-            }
-        }
-        .rotation3DEffect(.degrees(rotation.y), axis: (0, 1, 0), anchor: .center, perspective: 0.2)
-        .rotation3DEffect(.degrees(-rotation.x), axis: (1, 0, 0), anchor: .center, perspective: 0.2)
-        .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.8), value: proximity)
-    }
-    // MARK: - 3D Depth Transform
-
-    /// Subtle 3D rotation per line based on proximity:
-    /// - Active line: no rotation (front and center)
-    /// - Near lines: slight Y rotation, like lines on a curved surface
-    /// - Far lines: more rotation, creating depth
-    private var depthRotation: (x: Double, y: Double) {
-        switch proximity {
-        case .active:
-            return (0, 0)
-        case .near:
-            return (1.5, 2.0)
-        case .far:
-            return (3.0, 4.0)
+        if isActive && !line.words.isEmpty {
+            wordHighlightedText
+        } else {
+            Text(line.text)
+                .font(isActive ? .system(size: 22, weight: .medium)
+                    : isNear ? .system(size: 17)
+                    : .system(size: 15))
+                .foregroundColor(foreground)
+                .lineSpacing(12)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
         }
     }
 
-    /// 逐字高亮文本 — 柔和渐变效果
+    /// 逐字高亮 — 柔和渐变效果
     private var wordHighlightedText: some View {
         HStack(spacing: 0) {
             ForEach(Array(line.words.enumerated()), id: \.element.id) { index, word in
-                let opacity = wordOpacity(word: word, at: index, in: line.words, with: displayTime)
-                let scale = wordScale(word: word, at: index, in: line.words, with: displayTime)
                 Text(word.text)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(themeManager.isDarkMode ? .white : .black)
-                    .opacity(opacity)
-                    .scaleEffect(scale)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundColor(isDarkMode ? .white : .black)
+                    .opacity(wordOpacity(word: word, at: index, in: line.words, with: displayTime))
+                    .scaleEffect(wordScale(word: word, at: index, in: line.words, with: displayTime))
             }
         }
         .lineSpacing(12)
@@ -139,60 +139,39 @@ struct LyricLineView: View {
     }
 
     /// 计算每个字的透明度 — 当前字最亮，前后渐变
-    /// Optimized: uses estimated per-character duration derived from the next word's
-    /// time offset, falling back to a fixed 0.4s per character when next-word info is
-    /// unavailable. Avoids repeated next-word array lookups.
     private func wordOpacity(word: LyricWord, at index: Int, in words: [LyricWord], with time: TimeInterval) -> Double {
+        guard time >= 0 else { return 0.3 }
         let timeDiff = time - word.time
-
-        // Not yet reached this word
         if timeDiff < 0 { return 0.3 }
-
-        // Estimate per-character duration: use next word's offset or default 0.4s
-        let duration: TimeInterval
-        if index + 1 < words.count {
-            duration = max(words[index + 1].time - word.time, 0.05)
-        } else {
-            duration = 0.4
-        }
-
+        let duration: TimeInterval = (index + 1 < words.count)
+            ? max(words[index + 1].time - word.time, 0.05)
+            : 0.4
         if timeDiff < duration {
             let progress = timeDiff / duration
             return 0.3 + 0.7 * (1.0 - progress * 0.3)
         }
-
         return 0.7
     }
 
     /// 计算每个字的缩放 — 当前字稍微放大
-    /// Optimized: uses estimated per-character duration, avoiding backward-scan.
     private func wordScale(word: LyricWord, at index: Int, in words: [LyricWord], with time: TimeInterval) -> CGFloat {
+        guard time >= 0 else { return 1.0 }
         let timeDiff = time - word.time
-
         if timeDiff < 0 { return 1.0 }
-
-        let duration: TimeInterval
-        if index + 1 < words.count {
-            duration = max(words[index + 1].time - word.time, 0.05)
-        } else {
-            duration = 0.4
-        }
-
+        let duration: TimeInterval = (index + 1 < words.count)
+            ? max(words[index + 1].time - word.time, 0.05)
+            : 0.4
         if timeDiff < duration {
-            let progress = timeDiff / duration
-            return 1.05 - progress * 0.03
+            return 1.05 - (timeDiff / duration) * 0.03
         }
-
         return 1.0
     }
 
     private var foreground: Color {
-        let isDark = themeManager.isDarkMode
-        switch proximity {
-        case .active: return isDark ? .white : .black
-        case .near:   return isDark ? .white.opacity(0.6) : .black.opacity(0.6)
-        case .far:    return isDark ? .white.opacity(0.25) : .black.opacity(0.25)
-        }
+        let base = isDarkMode ? Color.white : Color.black
+        if isActive { return base }
+        if isNear { return base.opacity(0.6) }
+        return base.opacity(0.25)
     }
 }
 
@@ -200,11 +179,10 @@ struct LyricLineView: View {
 
 struct LyricLine: Identifiable {
     let id = UUID()
-    let time: TimeInterval   // seconds from start
+    let time: TimeInterval
     let text: String
-    let words: [LyricWord]   // 逐字时间戳，用于逐字高亮
+    let words: [LyricWord]
 
-    /// 便捷初始化，默认 words 为空
     init(time: TimeInterval, text: String, words: [LyricWord] = []) {
         self.time = time
         self.text = text
@@ -214,13 +192,11 @@ struct LyricLine: Identifiable {
 
 struct LyricWord: Identifiable {
     let id = UUID()
-    let time: TimeInterval   // 这个字开始的时间
-    let text: String         // 单个字或字符
+    let time: TimeInterval
+    let text: String
 }
 
 /// LRC parser — supports both line-level and word-level timestamps
-/// Line format: "[mm:ss.xx]text"
-/// Word format: "[mm:ss.xx]字[mm:ss.xx]字..." (each character has its own timestamp)
 struct LrcParser {
     static func parse(lrcText: String) -> [LyricLine] {
         var lines: [LyricLine] = []
@@ -241,7 +217,6 @@ struct LrcParser {
             let time = minutes * 60 + seconds + fraction / divisor
 
             if !text.isEmpty {
-                // Try to parse word-level timestamps
                 let words = parseWords(from: text, lineTime: time)
                 lines.append(LyricLine(time: time, text: text, words: words))
             }
@@ -250,7 +225,6 @@ struct LrcParser {
         return lines.sorted { $0.time < $1.time }
     }
 
-    /// Parse word-level timestamps: "[00:01.00]字[00:01.20]字..."
     private static func parseWords(from text: String, lineTime: TimeInterval) -> [LyricWord] {
         var words: [LyricWord] = []
         let pattern = #"\[(\d{2}):(\d{2})\.(\d{2,3})\]([^[]"*)"#
@@ -269,41 +243,31 @@ struct LrcParser {
             let divisor: Double = ms.count == 2 ? 100.0 : 1000.0
             let time = minutes * 60 + seconds + fraction / divisor
 
-            // Add each character as a separate word
             for char in wordText {
                 words.append(LyricWord(time: time, text: String(char)))
             }
         }
 
-        // If no word-level timestamps found, return empty (will fall back to line-level)
         return words
     }
 
-    /// Auto-generate word timestamps by distributing time evenly across characters
-    /// Called after parsing to fill in words for lines that don't have word-level timestamps
     static func assignWordsToLines(_ lines: [LyricLine]) -> [LyricLine] {
         guard lines.count > 0 else { return lines }
 
         return lines.enumerated().map { index, line in
-            // If words already exist, keep them
-            if !line.words.isEmpty {
-                return line
-            }
+            if !line.words.isEmpty { return line }
 
-            // Calculate duration for this line (time until next line starts)
             let nextTime: TimeInterval
             if index < lines.count - 1 {
                 nextTime = lines[index + 1].time
             } else {
-                nextTime = line.time + 3.0  // Last line gets 3 seconds
+                nextTime = line.time + 3.0
             }
-            let duration = max(nextTime - line.time, 0.5)  // Minimum 0.5s
+            let duration = max(nextTime - line.time, 0.5)
 
-            // Skip empty or very short text
             let chars = Array(line.text).filter { !$0.isWhitespace }
             guard !chars.isEmpty else { return line }
 
-            // Distribute time evenly across characters
             let interval = duration / Double(chars.count)
             let words = chars.enumerated().map { charIndex, char in
                 LyricWord(time: line.time + Double(charIndex) * interval, text: String(char))

@@ -162,6 +162,8 @@ class MainPlayerWindow: NSWindow {
     }
 
     /// Green button calls zoom: — smooth custom animation instead of default zoom.
+    /// Uses NSAnimation (not animator().setFrame()) because animationBehavior = .none
+    /// disables the animator proxy for window frame changes.
     override func zoom(_ sender: Any?) {
         NotificationCenter.default.post(name: .windowWillZoom, object: nil)
 
@@ -172,12 +174,9 @@ class MainPlayerWindow: NSWindow {
                 return
             }
 
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.4
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                ctx.allowsImplicitAnimation = true
-                self.animator().setFrame(savedFrame, display: true)
-            } completionHandler: {
+            let startFrame = frame
+            animateWindowFrame(from: startFrame, to: savedFrame) { [weak self] in
+                guard let self = self else { return }
                 self.isCurrentlyZoomed = false
                 NotificationCenter.default.post(name: .windowDidZoom, object: nil)
             }
@@ -186,18 +185,45 @@ class MainPlayerWindow: NSWindow {
             savedFrameBeforeZoom = frame
 
             let screenFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? frame
-            let targetFrame = screenFrame
+            let startFrame = frame
 
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.4
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                ctx.allowsImplicitAnimation = true
-                self.animator().setFrame(targetFrame, display: true)
-            } completionHandler: {
+            animateWindowFrame(from: startFrame, to: screenFrame) { [weak self] in
+                guard let self = self else { return }
                 self.isCurrentlyZoomed = true
                 NotificationCenter.default.post(name: .windowDidZoom, object: nil)
             }
         }
+    }
+
+    /// Animate window frame using NSAnimation (not animator proxy, which is
+    /// disabled by animationBehavior = .none). Interpolates the frame rect
+    /// on each progress tick so both the window and its SwiftUI content
+    /// smoothly resize together.
+    private func animateWindowFrame(from startFrame: NSRect, to endFrame: NSRect, duration: TimeInterval = 0.4, completion: @escaping () -> Void) {
+        let animation = NSAnimation(duration: duration, animationCurve: .easeInOut)
+        animation.animationBlockingMode = .nonblocking
+
+        var observation: NSKeyValueObservation?
+        observation = animation.observe(\.currentProgress) { [weak self] anim, _ in
+            guard let self = self else { return }
+            let t = CGFloat(anim.currentProgress)
+            let frame = NSRect(
+                x: startFrame.origin.x + (endFrame.origin.x - startFrame.origin.x) * t,
+                y: startFrame.origin.y + (endFrame.origin.y - startFrame.origin.y) * t,
+                width: startFrame.size.width + (endFrame.size.width - startFrame.size.width) * t,
+                height: startFrame.size.height + (endFrame.size.height - startFrame.size.height) * t
+            )
+            self.setFrame(frame, display: true, animate: false)
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("NSAnimationDidEndNotification"), object: animation, queue: .main
+        ) { _ in
+            observation?.invalidate()
+            completion()
+        }
+
+        animation.start()
     }
 
     /// Custom zoom state tracking

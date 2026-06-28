@@ -5,17 +5,16 @@ struct NowPlayingView: View {
     let artworkData: Data?
     let lyrics: [LyricLine]
     let currentLineIndex: Int
-    let currentTime: TimeInterval  // 当前播放时间，用于逐字高亮
     var isPlaying: Bool = false
     var showRhythm: Bool = false
     var showPlaylist: Bool = false  // 控制歌词偏移
 
-    @ObservedObject var themeManager = ThemeManager.shared
+    /// Observe TimeManager directly so this view's body re-evaluates for
+    /// time changes without triggering parent (MainPlayerView) or sibling
+    /// (CompactControlBar) re-evaluation.
+    @ObservedObject var timeManager = TimeManager.shared
 
-    /// 暂停时记录最后一次旋转角度，避免跳回 0°
-    @State private var pauseAngle: Double = 0
-    /// 播放时的旋转起始时间，用于「暂停→恢复」时无缝衔接角度
-    @State private var rotationStartTime: Date = Date()
+    @ObservedObject var themeManager = ThemeManager.shared
 
     /// 自动 3D 摆动相位 — 用 SwiftUI .repeatForever 驱动，零额外 CPU
     /// 两个独立相位制造 Lissajous 式旋转，感觉像真实唱片在转盘上微微晃动
@@ -46,24 +45,14 @@ struct NowPlayingView: View {
         .padding(.leading, 80)
         .padding(.trailing, 40)
         .padding(.vertical, 40)
-        .onChange(of: isPlaying) { newValue in
-            if newValue {
-                // Resuming: offset rotationStartTime so the angle continues
-                // from pauseAngle rather than restarting from 0°.
-                // Map pauseAngle → elapsed seconds → offset the start time.
-                let elapsedSec = (pauseAngle / 360.0) * 8.0
-                rotationStartTime = Date().addingTimeInterval(-elapsedSec)
-            }
-        }
         .onAppear {
             // Start auto 3D tilt oscillation — no NSTrackingArea needed,
             // no CPU overhead, purely GPU-driven animation.
-            // X-axis: 5s cycle, Y-axis: 4s cycle with 1.25s offset for Lissajous
-            withAnimation(.easeInOut(duration: 5).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) {
                 discTiltPhaseX = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
-                withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.875) {
+                withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
                     discTiltPhaseY = true
                 }
             }
@@ -74,10 +63,9 @@ struct NowPlayingView: View {
 
     private var vinylSection: some View {
         // Auto-oscillating tilt derived from SwiftUI animation phases.
-        // discTiltPhaseX animates false→true→false on a 5s easeInOut loop.
-        // Map: false→-2°, true→+2° for a smooth ±2° sway.
-        let tiltX: Double = (discTiltPhaseX ? 2.0 : -2.0)
-        let tiltY: Double = (discTiltPhaseY ? 1.5 : -1.5)
+        // Map: false→-4°, true→+4° for a smooth ±4° sway on each axis.
+        let tiltX: Double = (discTiltPhaseX ? 4.0 : -4.0)
+        let tiltY: Double = (discTiltPhaseY ? 3.0 : -3.0)
         return ZStack {
             // Outer disc (black vinyl)
             Circle()
@@ -90,51 +78,11 @@ struct NowPlayingView: View {
                 Circle()
                     .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
                     .frame(width: CGFloat(280 - i * 20), height: CGFloat(280 - i * 20))
-                    .offset(x: CGFloat(i) * 0.5, y: 0)  // micro-offset for depth
             }
 
-            // Album art (center disc, rotating via TimelineView)
-            // @State pauseAngle freezes the rotation when paused so the disc
-            // stays at the last angle instead of snapping back to 0°.
-            if let data = artworkData, let nsImage = NSImage(data: data) {
-                if isPlaying {
-                    // 20fps is sufficient for a smooth disc rotation —
-                    // saves ~33% CPU vs 30fps with no visible difference.
-                    TimelineView(.periodic(from: .now, by: 1.0 / 20.0)) { context in
-                        let elapsed = context.date.timeIntervalSince(self.rotationStartTime)
-                        let angle = (elapsed.truncatingRemainder(dividingBy: 8.0) / 8.0) * 360.0
-
-                        Image(nsImage: nsImage)
-                            .resizable()
-                            .interpolation(.high)
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 180, height: 180)
-                            .clipShape(Circle())
-                            .rotationEffect(.degrees(angle))
-                            .onChange(of: angle) { newAngle in
-                                pauseAngle = newAngle
-                            }
-                    }
-                } else {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 180, height: 180)
-                        .clipShape(Circle())
-                        .rotationEffect(.degrees(pauseAngle))
-                }
-            } else {
-                // Placeholder
-                Circle()
-                    .fill(placeholderBg)
-                    .frame(width: 180, height: 180)
-                    .overlay(
-                        Image(systemName: "music.note")
-                            .font(.system(size: 50))
-                            .foregroundColor(tertiaryText)
-                    )
-            }
+            // Album art (center disc) — isolated in a TimelineView so only this tiny
+            // subview rebuilds each tick, NOT the entire vinylSection ZStack.
+            RotatingArtView(artworkData: artworkData, isPlaying: isPlaying)
 
             // Center hole
             Circle()
@@ -146,20 +94,13 @@ struct NowPlayingView: View {
                 .fill(Color.white.opacity(0.3))
                 .frame(width: 4, height: 4)
         }
-        // Gentle auto-oscillating 3D tilt — like a record swaying on a turntable.
-        // Driven by .repeatForever animation on discTiltPhase, so the tilt
-        // smoothly oscillates with zero CPU overhead (no TimelineView needed).
-        .rotation3DEffect(.degrees(-tiltX), axis: (1, 0, 0), anchor: .center, perspective: 0.5)
-        .rotation3DEffect(.degrees(tiltY), axis: (0, 1, 0), anchor: .center, perspective: 0.5)
-        // Smooth album art swap when track changes — spring crossfade
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: artworkData)
     }
 
     private var lyricsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Lyrics
             if !lyrics.isEmpty {
-                LyricsView(lyrics: lyrics, currentLineIndex: currentLineIndex, currentTime: currentTime, isPlaying: isPlaying)
+                LyricsView(lyrics: lyrics, currentLineIndex: currentLineIndex, currentTime: timeManager.currentTime, isPlaying: isPlaying)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // No lyrics placeholder
@@ -175,6 +116,74 @@ struct NowPlayingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    // MARK: - Disc Rotation (placeholder keeps center alignment)
+
+    private var placeholderCenter: some View {
+        Circle()
+            .fill(placeholderBg)
+            .frame(width: 180, height: 180)
+            .overlay(
+                Image(systemName: "music.note")
+                    .font(.system(size: 50))
+                    .foregroundColor(tertiaryText)
+            )
+    }
+}
+
+// MARK: - Rotating Art (SwiftUI + Timer)
+
+/// Pure SwiftUI rotating artwork — Timer.publish drives rotationAngle.
+/// Isolated as a separate struct with @State, so only this tiny subview's
+/// body re-evaluates on each tick — parent vinylSection/NowPlayingView
+/// are NOT affected. NSImage is cached via @State to avoid re-decoding
+/// the image 60 times per second.
+private struct RotatingArtView: View {
+    let artworkData: Data?
+    let isPlaying: Bool
+
+    @State private var rotationAngle: Double = 0
+    @State private var cachedImage: NSImage?
+    private let timer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        Group {
+            if let img = cachedImage {
+                Image(nsImage: img)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 180, height: 180)
+                    .clipShape(Circle())
+                    .rotationEffect(.degrees(rotationAngle))
+            } else {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 180, height: 180)
+                    .overlay(
+                        Image(systemName: "music.note")
+                            .font(.system(size: 50))
+                            .foregroundColor(Color.white.opacity(0.3))
+                    )
+            }
+        }
+        .onReceive(timer) { _ in
+            guard isPlaying else { return }
+            rotationAngle = (rotationAngle + 0.75).truncatingRemainder(dividingBy: 360.0)
+        }
+        .onChange(of: artworkData) { newData in
+            if let data = newData {
+                cachedImage = NSImage(data: data)
+            } else {
+                cachedImage = nil
+            }
+        }
+        .onAppear {
+            if let data = artworkData {
+                cachedImage = NSImage(data: data)
+            }
+        }
+    }
 }
 
 // MARK: - Music Rhythm Animation
@@ -182,27 +191,32 @@ struct NowPlayingView: View {
 class RhythmState: ObservableObject {
     @Published var bars: [CGFloat] = Array(repeating: 6, count: 18)
     var isPlaying = false
-    private static var timerKey = "rhythmTimer"
+    private var timerSource: DispatchSourceTimer?
 
     func startTimer() {
         stopTimer()
-        let source = DispatchSource.makeTimerSource(queue: .main)
-        // Reduce tick rate when playing: every 150ms is sufficient for this visual effect
-        source.schedule(deadline: .now(), repeating: .milliseconds(150))
+        // Use background queue so the timer doesn't compete with 60fps vinyl rotation
+        // on the main queue. Only the @Published update is dispatched to main.
+        let source = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInteractive))
+        source.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(5))
         source.setEventHandler { [weak self] in
-            guard let self = self else { return }
-            guard self.isPlaying else { return }
-            self.bars = (0..<18).map { _ in CGFloat.random(in: 6...42) }
+            guard let self = self, self.isPlaying else { return }
+            let newBars = (0..<18).map { _ in CGFloat.random(in: 6...48) }
+            DispatchQueue.main.async {
+                self.bars = newBars
+            }
         }
-        objc_setAssociatedObject(self, &Self.timerKey, source, .OBJC_ASSOCIATION_RETAIN)
         source.resume()
+        timerSource = source
     }
 
     func stopTimer() {
-        if let source = objc_getAssociatedObject(self, &Self.timerKey) as? DispatchSourceTimer {
-            source.cancel()
-        }
-        objc_setAssociatedObject(self, &Self.timerKey, nil, .OBJC_ASSOCIATION_RETAIN)
+        timerSource?.cancel()
+        timerSource = nil
+    }
+
+    deinit {
+        stopTimer()
     }
 }
 

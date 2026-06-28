@@ -9,9 +9,6 @@ struct SidePlaylistPanel: View {
     var onTrackTap: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
 
-    /// Namespace for matchedGeometryEffect — animates the active-track indicator
-    /// smoothly between rows when the user selects a different song.
-    @Namespace private var playlistAnimation
     @State private var searchText: String = ""
     @State private var selectedTab: String = "queue" // "history" or "queue"
     @FocusState private var isSearchFocused: Bool
@@ -43,15 +40,6 @@ struct SidePlaylistPanel: View {
             bottomInfo
         }
         .frame(maxHeight: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(themeManager.isDarkMode ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(themeManager.isDarkMode ? 0.1 : 0.15), lineWidth: 0.5)
-                )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 18))
         .onAppear {
             loadHistory()
         }
@@ -156,36 +144,15 @@ struct SidePlaylistPanel: View {
     // MARK: - Track List
 
     private var trackList: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 1) {
-                    ForEach(filteredTracks) { track in
-                        Button(action: {
-                            if let originalIndex = tracks.firstIndex(where: { $0.id == track.id }) {
-                                onTrackTap?(originalIndex)
-                            }
-                        }) {
-                            TrackRow(
-                                track: track,
-                                isActive: track.id == currentTrackID,
-                                namespace: playlistAnimation
-                            )
-                            .equatable()
-                        }
-                        .buttonStyle(.plain)
-                        .id(track.id)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-            .onChange(of: currentTrackID) { newID in
-                if let id = newID {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo(id, anchor: .center)
-                    }
+        PlaylistTableView(
+            tracks: filteredTracks,
+            currentTrackID: currentTrackID,
+            onTrackTap: { index in
+                if let origIndex = tracks.firstIndex(where: { $0.id == filteredTracks[index].id }) {
+                    onTrackTap?(origIndex)
                 }
             }
-        }
+        )
     }
 
     // MARK: - Bottom Info
@@ -243,99 +210,224 @@ struct SidePlaylistPanel: View {
     }
 }
 
-// MARK: - Track Row
+// MARK: - Playlist NSTableView
 
-private struct TrackRow: View, Equatable {
-    let track: Track
-    let isActive: Bool
-    var namespace: Namespace.ID
+/// NSTableView-based playlist for true native scrolling performance.
+/// NSTableView reuses cells (~15 visible for 300 tracks), supports
+/// hardware-accelerated scrolling, and avoids SwiftUI's view struct
+/// instantiation overhead entirely.
+private struct PlaylistTableView: NSViewRepresentable {
+    let tracks: [Track]
+    let currentTrackID: UUID?
+    var onTrackTap: ((Int) -> Void)?
 
-    static func == (lhs: TrackRow, rhs: TrackRow) -> Bool {
-        lhs.track.id == rhs.track.id &&
-        lhs.isActive == rhs.isActive
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onTap: onTrackTap)
     }
 
-    @ObservedObject var themeManager = ThemeManager.shared
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = false
+        scrollView.drawsBackground = false
+        scrollView.backgroundColor = .clear
 
-    var body: some View {
-        HStack(spacing: 10) {
-            // Album Art Thumbnail
-            if let data = track.albumArtData, let nsImage = NSImage(data: data) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .interpolation(.low)
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 36, height: 36)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            } else {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(themeManager.isDarkMode ? Color.white.opacity(0.06) : Color.black.opacity(0.05))
-                    .frame(width: 36, height: 36)
-                    .overlay(
-                        Image(systemName: "music.note")
-                            .font(.system(size: 12))
-                            .foregroundColor(themeManager.isDarkMode ? .white.opacity(0.25) : .black.opacity(0.25))
-                    )
-            }
+        let tableView = NSTableView()
+        tableView.style = .plain
+        tableView.backgroundColor = .clear
+        tableView.headerView = nil
+        tableView.intercellSpacing = NSSize(width: 0, height: 1)
+        tableView.rowHeight = 50
+        tableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
+        tableView.floatsGroupRows = false
+        tableView.selectionHighlightStyle = .none
+        let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("main"))
+        col.isEditable = false
+        tableView.addTableColumn(col)
+        tableView.setDraggingSourceOperationMask(.every, forLocal: true)
 
-            // Track Info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(track.title)
-                    .font(.system(size: 12, weight: isActive ? .medium : .regular))
-                    .foregroundColor(isActive ? primaryTextColor : secondaryTextColor)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+        tableView.delegate = context.coordinator
+        tableView.dataSource = context.coordinator
+        tableView.target = context.coordinator
+        tableView.action = #selector(Coordinator.rowClicked(_:))
 
-                if !track.artist.isEmpty {
-                    Text(track.artist)
-                        .font(.system(size: 10))
-                        .foregroundColor(tertiaryTextColor)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-            }
+        scrollView.documentView = tableView
 
-            Spacer(minLength: 6)
-
-            // Duration
-            Text(track.duration.formatDuration)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(tertiaryTextColor)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .background(
-            ZStack {
-                // Active indicator — uses matchedGeometryEffect so it smoothly
-                // animates between rows when a different track is selected.
-                if isActive {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(accentBgColor)
-                        .matchedGeometryEffect(id: "activeTrack", in: namespace)
-                }
-            }
+        // Track user-initiated scrolling — skip auto-scroll during user drag
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.willStartLiveScroll),
+            name: NSScrollView.willStartLiveScrollNotification,
+            object: scrollView
         )
-        .padding(.horizontal, 8)
-        // Smooth spring animation when becoming active/inactive
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isActive)
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.didEndLiveScroll),
+            name: NSScrollView.didEndLiveScrollNotification,
+            object: scrollView
+        )
+
+        return scrollView
     }
 
-    // MARK: - Theme-adaptive colors
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        guard let tableView = nsView.documentView as? NSTableView else { return }
 
-    private var primaryTextColor: Color {
-        themeManager.isDarkMode ? .white : .black
+        context.coordinator.tracks = tracks
+        context.coordinator.currentTrackID = currentTrackID
+        context.coordinator.onTrackTap = onTrackTap
+
+        // Only reloadData when track data actually changes
+        if context.coordinator.lastReloadIDs != Set(tracks.map(\.id)) {
+            context.coordinator.lastReloadIDs = Set(tracks.map(\.id))
+            tableView.reloadData()
+        }
+
+        // Only auto-scroll to current track when actively changing tracks,
+        // NOT when the user is manually scrolling.
+        if !context.coordinator.isUserScrolling,
+           context.coordinator.lastScrolledTrackID != currentTrackID {
+            context.coordinator.lastScrolledTrackID = currentTrackID
+            if let id = currentTrackID,
+               let idx = tracks.firstIndex(where: { $0.id == id }) {
+                tableView.scrollRowToVisible(idx)
+            }
+        }
     }
 
-    private var secondaryTextColor: Color {
-        themeManager.isDarkMode ? .white.opacity(0.8) : .black.opacity(0.8)
+    class Coordinator: NSObject, NSTableViewDelegate, NSTableViewDataSource {
+        var tracks: [Track] = []
+        var currentTrackID: UUID?
+        var onTrackTap: ((Int) -> Void)?
+
+        /// Track last reload data set to avoid unnecessary reloadData calls
+        var lastReloadIDs: Set<UUID> = []
+        /// Track last auto-scrolled track to avoid fighting user scroll
+        var lastScrolledTrackID: UUID?
+        /// User-initiated scroll flag — checked before auto-scroll
+        var isUserScrolling = false
+
+        init(onTap: ((Int) -> Void)?) {
+            self.onTrackTap = onTap
+        }
+
+        @objc func willStartLiveScroll() {
+            isUserScrolling = true
+        }
+
+        @objc func didEndLiveScroll() {
+            isUserScrolling = false
+        }
+
+        func numberOfRows(in tableView: NSTableView) -> Int {
+            tracks.count
+        }
+
+        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+            guard row < tracks.count else { return nil }
+            let track = tracks[row]
+            let isActive = track.id == currentTrackID
+
+            let identifier = NSUserInterfaceItemIdentifier("PlaylistCell")
+            let cell: PlaylistCell
+            if let reused = tableView.makeView(withIdentifier: identifier, owner: self) as? PlaylistCell {
+                cell = reused
+            } else {
+                cell = PlaylistCell()
+                cell.identifier = identifier
+            }
+            cell.configure(with: track, isActive: isActive)
+            return cell
+        }
+
+        @objc func rowClicked(_ sender: NSTableView) {
+            let row = sender.clickedRow
+            guard row >= 0, row < tracks.count else { return }
+            onTrackTap?(row)
+        }
+    }
+}
+
+/// Custom NSTableCellView for playlist rows.
+private class PlaylistCell: NSTableCellView {
+    private let artImageView = NSImageView()
+    private let titleField = NSTextField(labelWithString: "")
+    private let artistField = NSTextField(labelWithString: "")
+    private let durationField = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupViews()
     }
 
-    private var tertiaryTextColor: Color {
-        themeManager.isDarkMode ? .white.opacity(0.4) : .black.opacity(0.4)
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupViews()
     }
 
-    private var accentBgColor: Color {
-        themeManager.isDarkMode ? .white.opacity(0.08) : .black.opacity(0.06)
+    private func setupViews() {
+        // Album art
+        artImageView.wantsLayer = true
+        artImageView.layer?.cornerRadius = 6
+        artImageView.layer?.masksToBounds = true
+        artImageView.imageScaling = .scaleAxesIndependently
+        artImageView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(artImageView)
+
+        // Title
+        titleField.lineBreakMode = .byTruncatingTail
+        titleField.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(titleField)
+
+        // Artist
+        artistField.font = NSFont.systemFont(ofSize: 10)
+        artistField.textColor = .secondaryLabelColor
+        artistField.lineBreakMode = .byTruncatingTail
+        artistField.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(artistField)
+
+        // Duration
+        durationField.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
+        durationField.textColor = .secondaryLabelColor
+        durationField.alignment = .right
+        durationField.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(durationField)
+
+        NSLayoutConstraint.activate([
+            artImageView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            artImageView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            artImageView.widthAnchor.constraint(equalToConstant: 36),
+            artImageView.heightAnchor.constraint(equalToConstant: 36),
+
+            titleField.leadingAnchor.constraint(equalTo: artImageView.trailingAnchor, constant: 10),
+            titleField.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -8),
+            titleField.trailingAnchor.constraint(lessThanOrEqualTo: durationField.leadingAnchor, constant: -8),
+
+            artistField.leadingAnchor.constraint(equalTo: titleField.leadingAnchor),
+            artistField.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 8),
+            artistField.trailingAnchor.constraint(lessThanOrEqualTo: durationField.leadingAnchor, constant: -8),
+
+            durationField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            durationField.centerYAnchor.constraint(equalTo: centerYAnchor),
+            durationField.widthAnchor.constraint(equalToConstant: 50),
+        ])
+    }
+
+    func configure(with track: Track, isActive: Bool) {
+        if let data = track.albumArtData, let img = NSImage(data: data) {
+            artImageView.image = img
+        } else {
+            artImageView.image = nil
+        }
+
+        titleField.stringValue = track.title
+        titleField.font = isActive ? NSFont.systemFont(ofSize: 12, weight: .medium) : NSFont.systemFont(ofSize: 12)
+        titleField.textColor = isActive ? NSColor.labelColor : NSColor.secondaryLabelColor
+
+        artistField.stringValue = track.artist
+        artistField.textColor = .tertiaryLabelColor
+
+        durationField.stringValue = track.duration.formatDuration
+        durationField.textColor = .tertiaryLabelColor
     }
 }
 

@@ -23,9 +23,6 @@ struct AlbumArtBackground: View {
     @State private var artworkDestroyed: Bool = false
     @State private var dominantColor: Color = Color(red: 0.1, green: 0.1, blue: 0.15)
 
-    /// Parallax drift offset and scale for the album art background.
-    /// Creates a subtle "living wallpaper" effect rather than a static image.
-    @State private var parallaxOffset: CGSize = .zero
 
     var body: some View {
         GeometryReader { geo in
@@ -51,8 +48,6 @@ struct AlbumArtBackground: View {
                         .interpolation(.high)
                         .aspectRatio(contentMode: .fill)
                         .frame(width: geo.size.width, height: geo.size.height)
-                        .scaleEffect(1.04)  // slight overscale for drift room
-                        .offset(parallaxOffset)
                         .clipped()
                         .opacity(artworkOpacity)
                         .transition(.opacity)
@@ -99,7 +94,6 @@ struct AlbumArtBackground: View {
         .onAppear {
             updateBreatheAnimation()
             extractDominantColor()
-            startParallaxDrift()
         }
         .onChange(of: isAnimating) { _ in
             updateBreatheAnimation()
@@ -109,7 +103,6 @@ struct AlbumArtBackground: View {
         }
         .onChange(of: trackID) { _ in
             extractDominantColor()
-            startParallaxDrift()
         }
         .onReceive(NotificationCenter.default.publisher(for: .windowWillZoom)) { _ in
             artworkDestroyed = true
@@ -176,18 +169,4 @@ struct AlbumArtBackground: View {
         dominantColor = ColorExtractor.shared.dominantColor(from: artworkData, for: trackID)
     }
 
-    /// Start a slow parallax drift on the album art background.
-    /// The image slowly pans in a looping pattern for a "living wallpaper" feel.
-    private func startParallaxDrift() {
-        // Cancel any existing animation on the offset
-        withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.8)) {
-            parallaxOffset = .zero
-        }
-        // Start looping pan animation
-        withAnimation(
-            .easeInOut(duration: 15).repeatForever(autoreverses: true)
-        ) {
-            parallaxOffset = CGSize(width: 18, height: -10)
-        }
-    }
 }

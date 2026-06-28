@@ -7,8 +7,6 @@ struct MainPlayerView: View {
     @ObservedObject var themeManager = ThemeManager.shared
     @State private var lyrics: [LyricLine] = []
     @State private var lastLyricIndex: Int = -1
-    /// Throttle lyric index updates to once per second instead of every 100ms
-    @State private var lastLyricUpdateSecond: Int = -1
 
     /// Thread-safe artwork cache that auto-evicts under memory pressure.
     private let artworkCache: NSCache<NSString, NSData> = {
@@ -105,7 +103,7 @@ struct MainPlayerView: View {
             viewModeSelector
         }
         .overlay(alignment: .trailing) {
-            // Playlist Panel — floating card with padding, rounded corners
+            // Playlist Panel — seamlessly integrated with window background
             SidePlaylistPanel(
                 tracks: player.playlist,
                 currentTrackID: player.currentTrack?.id,
@@ -119,10 +117,9 @@ struct MainPlayerView: View {
                 }
             )
             .frame(width: 300)
-            .padding(.vertical, 20)
-            .shadow(color: .black.opacity(0.25), radius: 20, x: -5, y: 0)
+            // No vertical padding — seamlessly edge-to-edge with window background
             .offset(x: showPlaylist ? 0 : 340)
-            .rotation3DEffect(.degrees(showPlaylist ? 0 : 12), axis: (0, 1, 0), anchor: .leading, perspective: 0.4)
+            .opacity(showPlaylist ? 1 : 0)
             .animation(.spring(response: 0.45, dampingFraction: 0.82), value: showPlaylist)
         }
         .onHover { hovering in
@@ -176,36 +173,40 @@ struct MainPlayerView: View {
                 window.updateTitle()
             }
         }
-        .onChange(of: player.currentTime) { newTime in
-            // Throttle: only update lyric index when integer second changes
-            let wholeSecond = Int(newTime)
-            if wholeSecond != lastLyricUpdateSecond {
-                lastLyricUpdateSecond = wholeSecond
-                updateLyricIndex(time: newTime)
-            }
+        // Observe TimeManager directly (not player.currentTime) so only
+        // this closure fires every 1s instead of triggering a full body
+        // re-evaluation of every PlayerManager-observing view.
+        .onReceive(TimeManager.shared.$currentTime) { newTime in
+            // Update lyric index every 250ms (matches time observer interval).
+            // Binary search is O(log n), so this is negligible CPU cost.
+            updateLyricIndex(time: newTime)
         }
     }
 
     // MARK: - Main Content
 
+    /// Only render the active view — saves memory + CPU by not keeping inactive
+    /// view trees (e.g. 300-row TrackEditorView) alive in the background.
+    @ViewBuilder
     private var mainContent: some View {
-        ZStack {
+        switch viewMode {
+        case "home":
             HomeView(player: player)
-                .opacity(viewMode == "home" ? 1 : 0)
-
+        case "editor":
+            TrackEditorView(player: player)
+        default:
             NowPlayingView(
                 artworkData: currentArtworkData,
                 lyrics: lyrics,
                 currentLineIndex: lastLyricIndex,
-                currentTime: player.currentTime,
                 isPlaying: player.isPlaying,
                 showRhythm: showRhythm,
                 showPlaylist: showPlaylist
             )
-            .opacity(viewMode == "home" ? 0 : viewMode == "nowPlaying" ? 1 : 0)
-
-            TrackEditorView(player: player)
-                .opacity(viewMode == "editor" ? 1 : 0)
+            // NOTE: No .id() on NowPlayingView! SwiftUI's natural prop diffing handles
+            // lyrics refresh correctly — ForEach(id: \.element.id) in LyricsView sees new
+            // UUIDs on track change and rebuilds rows. An .id() would destroy the ScrollView
+            // state, causing lyrics scroll position loss (the "position offset" bug).
         }
     }
 
@@ -288,6 +289,10 @@ struct MainPlayerView: View {
     // MARK: - Lyrics Loading
 
     private func loadLyrics() {
+        // Reset BEFORE loading new lyrics to avoid showing old lyrics/index
+        // during the brief window between track change and lyrics parsing.
+        lastLyricIndex = -1
+
         guard let track = player.currentTrack else {
             lyrics = []
             return

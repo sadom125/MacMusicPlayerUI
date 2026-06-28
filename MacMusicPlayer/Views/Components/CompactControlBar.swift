@@ -17,6 +17,7 @@ struct CompactControlBar: View {
     @State private var volume: Float = 0.3
     @State private var showSharePopover: Bool = false
     @State private var likeBurstCount: Int = 0
+    @State private var thumbsFill: Bool = false
     @State private var starBurstCount: Int = 0
     @ObservedObject var themeManager = ThemeManager.shared
     @ObservedObject private var favoritesManager = FavoritesManager.shared
@@ -54,8 +55,6 @@ struct CompactControlBar: View {
         .padding(.bottom, 20)
         .offset(y: isVisible ? 0 : 100)
         .opacity(isVisible ? 1 : 0)
-        .scaleEffect(isVisible ? 1 : 0.95, anchor: .bottom)
-        .rotation3DEffect(.degrees(isVisible ? 0 : 8), axis: (1, 0, 0), anchor: .bottom, perspective: 0.3)
     }
 
     // MARK: - Top Row (Track Info + Actions)
@@ -81,10 +80,19 @@ struct CompactControlBar: View {
 
                 Button(action: {
                     likeBurstCount += 1
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.4)) {
+                        thumbsFill = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            thumbsFill = false
+                        }
+                    }
                 }) {
-                    Image(systemName: "hand.thumbsup")
+                    Image(systemName: thumbsFill ? "hand.thumbsup.fill" : "hand.thumbsup")
                         .font(.system(size: 14))
-                        .foregroundColor(iconColor)
+                        .foregroundColor(thumbsFill ? themeManager.accent : iconColor)
+                        .scaleEffect(thumbsFill ? 1.3 : 1.0)
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)
@@ -207,13 +215,8 @@ struct CompactControlBar: View {
                 .buttonStyle(.plain)
             }
 
-            // Progress Slider
+            // Progress Slider — uses TimeManager.shared internally, no bindings
             ProgressSlider(
-                currentTime: Binding(
-                    get: { player.currentTime },
-                    set: { player.currentTime = $0 }
-                ),
-                duration: player.duration,
                 onSeek: { time in player.seek(to: time) }
             )
 

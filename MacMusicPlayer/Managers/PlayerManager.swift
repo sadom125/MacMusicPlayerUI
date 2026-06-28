@@ -16,9 +16,22 @@ class PlayerManager: NSObject, ObservableObject {
             NotificationCenter.default.post(name: .playbackStateChanged, object: nil)
         }
     }
+    /// Background detection: skip time observer callbacks when window isn't visible
+    private var isInBackground = false
     @Published var isLoading = false
-    @Published var currentTime: TimeInterval = 0
-    @Published var duration: TimeInterval = 0
+
+    /// Proxies to TimeManager.shared — not @Published, so views that observe
+    /// PlayerManager (CompactControlBar, MainPlayerView) do NOT re-evaluate
+    /// their body every 1s when only time changes.
+    var currentTime: TimeInterval {
+        get { TimeManager.shared.currentTime }
+        set { TimeManager.shared.currentTime = newValue }
+    }
+
+    var duration: TimeInterval {
+        get { TimeManager.shared.duration }
+        set { TimeManager.shared.duration = newValue }
+    }
 
     private let queueController: QueuePlayerController
     private let playlistStore: PlaylistStore
@@ -153,6 +166,14 @@ class PlayerManager: NSObject, ObservableObject {
 
         // Periodic time observer for current position
         setupTimeObserver()
+
+        // Pause time observer when app goes to background (save CPU)
+        NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.isInBackground = true
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.isInBackground = false
+        }
     }
 
     private func setupTimeObserver() {
@@ -162,7 +183,7 @@ class PlayerManager: NSObject, ObservableObject {
         let interval = CMTime(seconds: 1.0, preferredTimescale: 10)
         timeObserver = queueController.queuePlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
-            guard self.isPlaying else { return }
+            guard self.isPlaying, !self.isInBackground else { return }
 
             let secs = CMTimeGetSeconds(time)
             self.currentTime = secs.isFinite ? secs : 0
