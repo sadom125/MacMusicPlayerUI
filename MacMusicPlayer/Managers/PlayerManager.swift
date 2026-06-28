@@ -294,14 +294,15 @@ class PlayerManager: NSObject, ObservableObject {
                 }
             }
 
-            // Kick off async metadata parsing in background — limit to 8 concurrent tasks
+            // Kick off async metadata parsing — limit to 8 concurrent tasks.
+            // Use .utility priority (not .background) so metadata finishes in reasonable
+            // time without starving the UI. .background tasks get deprioritized so heavily
+            // that the last 50 tracks of a 300-track library can take >30 seconds.
             let semaphore = AsyncSemaphore(limit: 8)
             for track in newPlaylist {
                 let capturedURL = track.url
                 let capturedTrack = track
-                // Use .background priority so metadata parsing doesn't compete with
-                // the 60fps disc rotation animation or other UI work.
-                self.metadataTasks[track.id] = Task(priority: .background) { [weak self] in
+                self.metadataTasks[track.id] = Task(priority: .utility) { [weak self] in
                     guard let self else { return }
                     await semaphore.wait()
                     guard let meta = await MetadataParser.parse(from: capturedURL) else {
@@ -313,22 +314,26 @@ class PlayerManager: NSObject, ObservableObject {
                 }
             }
 
-            // Parse first track's artwork & lyrics synchronously so UI has data immediately
-            if var firstTrack = newPlaylist.first {
-                let artwork = MetadataParser.parseArtworkDirect(from: firstTrack.url)
-                let lyrics = MetadataParser.parseLyricsDirect(from: firstTrack.url)
+            // Eagerly parse first 15 tracks' artwork & lyrics synchronously
+            // so the playlist panel shows covers/artist immediately at launch
+            // instead of waiting for N async tasks to trickle in.
+            let eagerBatchSize = min(15, newPlaylist.count)
+            for i in 0..<eagerBatchSize {
+                var track = newPlaylist[i]
+                let artwork = MetadataParser.parseArtworkDirect(from: track.url)
+                let lyrics = MetadataParser.parseLyricsDirect(from: track.url)
                 if artwork != nil || lyrics != nil {
-                    firstTrack = Track(
-                        id: firstTrack.id,
-                        title: firstTrack.title,
-                        artist: firstTrack.artist,
-                        album: firstTrack.album,
+                    track = Track(
+                        id: track.id,
+                        title: track.title,
+                        artist: track.artist,
+                        album: track.album,
                         albumArtData: artwork,
-                        duration: firstTrack.duration,
-                        url: firstTrack.url,
+                        duration: track.duration,
+                        url: track.url,
                         lyrics: lyrics
                     )
-                    newPlaylist[0] = firstTrack
+                    newPlaylist[i] = track
                 }
             }
 
@@ -696,6 +701,49 @@ class PlayerManager: NSObject, ObservableObject {
         seek(to: currentTime + delta)
     }
 
+    /// When a track starts playing, immediately kick off a high-priority metadata
+    /// parse on a background queue so artwork/title/artist appear in the UI right
+    /// away instead of waiting for the low-priority async task queue to catch up.
+    private func ensureMetadataForCurrentTrack() {
+        guard let track = currentTrack else { return }
+        if track.albumArtData != nil { return }
+
+        let capturedURL = track.url
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            // parseSync does direct file I/O (FLAC byte scan, no AVAsset) — fast (~ms)
+            guard let meta = MetadataParser.parseSync(from: capturedURL) else { return }
+
+            let update = Track(
+                id: track.id,
+                title: meta.title,
+                artist: meta.artist,
+                album: meta.album,
+                albumArtData: meta.artworkData,
+                duration: meta.duration,
+                url: track.url,
+                lyrics: meta.lyrics
+            )
+
+            DispatchQueue.main.async { [self] in
+                // Re-check: track may have changed during dispatch
+                guard self.currentTrack?.id == track.id else { return }
+                self.currentTrack = update
+                if meta.duration > 0 { self.duration = meta.duration }
+                if let idx = self.playlist.firstIndex(where: { $0.id == track.id }) {
+                    self.playlist[idx] = update
+                }
+                if let storeIdx = self.playlistStore.tracks.firstIndex(where: { $0.id == track.id }) {
+                    var storeTracks = self.playlistStore.tracks
+                    storeTracks[storeIdx] = update
+                    self.playlistStore.setTracks(storeTracks)
+                }
+                if self.isPlaying { self.updateNowPlayingInfo() }
+                NotificationCenter.default.post(name: .currentTrackMetadataUpdated, object: nil)
+            }
+        }
+    }
+
     func playTrack(at index: Int) {
         guard index >= 0 && index < playlistStore.tracks.count else { return }
 
@@ -710,6 +758,9 @@ class PlayerManager: NSObject, ObservableObject {
         queueController.play()
         isPlaying = true
         updateNowPlayingInfo()
+
+        // Immediately load metadata if still placeholder
+        ensureMetadataForCurrentTrack()
     }
 
     func clearQueue() {

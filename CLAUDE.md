@@ -376,6 +376,47 @@ if isPlaying {
 }
 ```
 
-### 16. 打包前必须杀旧进程 ✅
+### 16. Task(priority: .background) 元数据加载极慢 ❌
+
+**问题：** `PlayerManager.loadTracksFromMusicFolder()` 使用 `Task(priority: .background)` 创建元数据解析任务。.background 是最低优先级，系统将 CPU 时间片几乎全部分给前台任务。300 首歌曲的库，最后几十首的元数据需要 30+ 秒才能解析完。用户切到那首歌时封面/歌手还是 placeholder。
+
+**正确方案：** 提升到 `.utility`（仍然低于用户交互优先级，但不会被完全饿死）：
+```swift
+self.metadataTasks[track.id] = Task(priority: .utility) { ... }
+```
+同时加入"当前歌曲优先解析"机制：
+```swift
+// 前 15 首使用同步 IO 预解析（封面、歌词立即可见）
+let eagerBatchSize = min(15, newPlaylist.count)
+for i in 0..<eagerBatchSize { /* parseSync + parseArtworkDirect */ }
+
+// 用户点击播放时立即高优解析当前曲目
+func playTrack(at index: Int) {
+    // ... 播放逻辑 ...
+    ensureMetadataForCurrentTrack()  // .userInitiated 队列, 绕过 async 排队
+}
+```
+
+### 17. ZStack + opacity 导致隐藏视图持续评估 body ❌
+
+**问题：** `MainPlayerView` 用 ZStack + opacity 保持 3 个页面（HomePage/NowPlaying/Editor）共存。所有子 View 都接收 `@ObservedObject var player: PlayerManager`。当 `player.currentTime` 每秒变化时，所有 3 个子 View 的 body 都会评估（即使 opacity=0 不可见）。`TrackEditorView` 中有数百首歌曲的列表，body 评估开销很大。
+
+**正确方案：** 组合使用：
+1. **EquatableView** — 让 ForEach 中的行只在数据变化时才重绘：
+```swift
+struct TrackRow: View, Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.track.id == rhs.track.id && lhs.isActive == rhs.isActive
+    }
+}
+// 在 ForEach 中使用 .equatable()
+TrackRow(...).equatable()
+```
+2. **当前歌曲即时解析** — 不在 ZStack 层面优化（会破坏视图状态），而是让隐藏视图的 body 评估尽可能轻量。
+3. **MetadataParser.parseSync()** — 仅同步 IO（无 AVAsset async），确保播放时封面秒现。
+
+⚠️ 不要用 `if viewMode == "editor" { TrackEditorView() }` 替代 opacity — 这会销毁/重建视图，丢失搜索状态、编辑内容。ZStack + opacity 虽然 body 评估浪费，但状态保持是正确的。优先用 EquatableView 优化子视图内部。
+
+### 18. 打包前必须杀旧进程 ✅
 
 每次重新打包 DMG 或构建新版本前，必须先 `pkill` 旧进程再启动新版本，否则运行的是旧代码。

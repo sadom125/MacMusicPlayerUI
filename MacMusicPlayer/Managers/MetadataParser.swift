@@ -14,6 +14,30 @@ struct MetadataParser {
         let lyrics: String?          // embedded LRC lyrics (FLAC Vorbis LYRICS tag)
     }
 
+    /// Synchronous fallback — no AVAsset loading, just direct file I/O.
+    /// Returns artwork + lyrics + filename-parsed title/artist instantly (~ms).
+    /// Call this when a track starts playing so the UI gets artwork immediately
+    /// instead of waiting for the async task to finish.
+    static func parseSync(from url: URL) -> Metadata? {
+        let filename = url.deletingPathExtension().lastPathComponent
+        var title = filename
+        var artist = NSLocalizedString("Unknown Artist", comment: "Default artist")
+        var album = NSLocalizedString("Unknown Album", comment: "Default album")
+
+        if let range = filename.range(of: " - ") {
+            title = String(filename[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+            artist = String(filename[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        } else if let range = filename.range(of: "-") {
+            title = String(filename[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+            artist = String(filename[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        }
+
+        let artworkData = parseArtworkDirect(from: url)
+        let lyrics = parseLyricsDirect(from: url)
+        // Duration = 0 when parsed synchronously; real duration comes from AVAsset later
+        return Metadata(title: title, artist: artist, album: album, artworkData: artworkData, duration: 0, lyrics: lyrics)
+    }
+
     /// Parse metadata from a local audio file URL.
     /// - Parameter url: File URL to an audio file (mp3, m4a, flac, wav, etc.)
     /// - Returns: Parsed metadata, or nil if the file can't be read.

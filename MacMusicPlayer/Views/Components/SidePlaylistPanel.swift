@@ -170,6 +170,7 @@ struct SidePlaylistPanel: View {
                                 isActive: track.id == currentTrackID,
                                 namespace: playlistAnimation
                             )
+                            .equatable()
                         }
                         .buttonStyle(.plain)
                         .id(track.id)
@@ -244,10 +245,15 @@ struct SidePlaylistPanel: View {
 
 // MARK: - Track Row
 
-private struct TrackRow: View {
+private struct TrackRow: View, Equatable {
     let track: Track
     let isActive: Bool
     var namespace: Namespace.ID
+
+    static func == (lhs: TrackRow, rhs: TrackRow) -> Bool {
+        lhs.track.id == rhs.track.id &&
+        lhs.isActive == rhs.isActive
+    }
 
     @ObservedObject var themeManager = ThemeManager.shared
 
