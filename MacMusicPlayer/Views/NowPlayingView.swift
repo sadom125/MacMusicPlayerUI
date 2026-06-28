@@ -17,9 +17,10 @@ struct NowPlayingView: View {
     /// 播放时的旋转起始时间，用于「暂停→恢复」时无缝衔接角度
     @State private var rotationStartTime: Date = Date()
 
-    /// 3D 倾斜角度 — 鼠标相对窗口位置驱动的弹簧动画
-    @State private var tiltX: Double = 0
-    @State private var tiltY: Double = 0
+    /// 自动 3D 摆动相位 — 用 SwiftUI .repeatForever 驱动，零额外 CPU
+    /// 两个独立相位制造 Lissajous 式旋转，感觉像真实唱片在转盘上微微晃动
+    @State private var discTiltPhaseX: Bool = false
+    @State private var discTiltPhaseY: Bool = false
 
     private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.3) : Color.black.opacity(0.3) }
     private var placeholderBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.1) : Color.black.opacity(0.08) }
@@ -54,26 +55,30 @@ struct NowPlayingView: View {
                 rotationStartTime = Date().addingTimeInterval(-elapsedSec)
             }
         }
-        // macOS 12 compat: NSTrackingArea overlay tracks mouse position for 3D tilt
-        .background(HoverPositionReporter(onHover: { location in
-            if let loc = location {
-                // Map mouse position to subtle 3D tilt (±3°)
-                let centerX: CGFloat = 200
-                let centerY: CGFloat = 160
-                tiltY = Double((loc.x - centerX) / centerX) * 3.0
-                tiltX = Double((loc.y - centerY) / centerY) * 3.0
-            } else {
-                // Spring animation smoothly returns to neutral
-                tiltX = 0
-                tiltY = 0
+        .onAppear {
+            // Start auto 3D tilt oscillation — no NSTrackingArea needed,
+            // no CPU overhead, purely GPU-driven animation.
+            // X-axis: 5s cycle, Y-axis: 4s cycle with 1.25s offset for Lissajous
+            withAnimation(.easeInOut(duration: 5).repeatForever(autoreverses: true)) {
+                discTiltPhaseX = true
             }
-        }))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
+                withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                    discTiltPhaseY = true
+                }
+            }
+        }
     }
 
     // MARK: - Vinyl Record
 
     private var vinylSection: some View {
-        ZStack {
+        // Auto-oscillating tilt derived from SwiftUI animation phases.
+        // discTiltPhaseX animates false→true→false on a 5s easeInOut loop.
+        // Map: false→-2°, true→+2° for a smooth ±2° sway.
+        let tiltX: Double = (discTiltPhaseX ? 2.0 : -2.0)
+        let tiltY: Double = (discTiltPhaseY ? 1.5 : -1.5)
+        return ZStack {
             // Outer disc (black vinyl)
             Circle()
                 .fill(Color.black)
@@ -141,12 +146,13 @@ struct NowPlayingView: View {
                 .fill(Color.white.opacity(0.3))
                 .frame(width: 4, height: 4)
         }
-        // 3D perspective tilt — follows mouse position for a subtle depth effect.
-        // The disc tilts like a real record on a turntable when you change angle.
+        // Gentle auto-oscillating 3D tilt — like a record swaying on a turntable.
+        // Driven by .repeatForever animation on discTiltPhase, so the tilt
+        // smoothly oscillates with zero CPU overhead (no TimelineView needed).
         .rotation3DEffect(.degrees(-tiltX), axis: (1, 0, 0), anchor: .center, perspective: 0.5)
         .rotation3DEffect(.degrees(tiltY), axis: (0, 1, 0), anchor: .center, perspective: 0.5)
-        .animation(.interactiveSpring(response: 0.15, dampingFraction: 0.7), value: tiltX)
-        .animation(.interactiveSpring(response: 0.15, dampingFraction: 0.7), value: tiltY)
+        // Smooth album art swap when track changes — spring crossfade
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: artworkData)
     }
 
     private var lyricsSection: some View {
@@ -237,56 +243,5 @@ struct MusicRhythmView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Hover Position Tracker (macOS 12+)
-
-/// NSViewRepresentable that sets up an NSTrackingArea to report mouse position.
-/// Used for driving 3D tilt effects on the vinyl record.
-struct HoverPositionReporter: NSViewRepresentable {
-    let onHover: (CGPoint?) -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = TrackingNSView()
-        view.onHover = onHover
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        if let trackingView = nsView as? TrackingNSView {
-            trackingView.onHover = onHover
-            trackingView.updateTrackingAreas()
-        }
-    }
-}
-
-fileprivate class TrackingNSView: NSView {
-    var onHover: ((CGPoint?) -> Void)?
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        // Remove old tracking areas
-        trackingAreas.forEach { removeTrackingArea($0) }
-
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseMoved, .activeInActiveApp, .inVisibleRect, .mouseEnteredAndExited],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(area)
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        onHover?(convert(event.locationInWindow, from: nil))
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        onHover?(convert(event.locationInWindow, from: nil))
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        onHover?(nil)
     }
 }

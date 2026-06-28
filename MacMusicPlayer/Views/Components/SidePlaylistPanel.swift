@@ -9,6 +9,9 @@ struct SidePlaylistPanel: View {
     var onTrackTap: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
 
+    /// Namespace for matchedGeometryEffect — animates the active-track indicator
+    /// smoothly between rows when the user selects a different song.
+    @Namespace private var playlistAnimation
     @State private var searchText: String = ""
     @State private var selectedTab: String = "queue" // "history" or "queue"
     @FocusState private var isSearchFocused: Bool
@@ -164,7 +167,8 @@ struct SidePlaylistPanel: View {
                         }) {
                             TrackRow(
                                 track: track,
-                                isActive: track.id == currentTrackID
+                                isActive: track.id == currentTrackID,
+                                namespace: playlistAnimation
                             )
                         }
                         .buttonStyle(.plain)
@@ -243,6 +247,7 @@ struct SidePlaylistPanel: View {
 private struct TrackRow: View {
     let track: Track
     let isActive: Bool
+    var namespace: Namespace.ID
 
     @ObservedObject var themeManager = ThemeManager.shared
 
@@ -294,10 +299,19 @@ private struct TrackRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isActive ? accentBgColor : Color.clear)
+            ZStack {
+                // Active indicator — uses matchedGeometryEffect so it smoothly
+                // animates between rows when a different track is selected.
+                if isActive {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(accentBgColor)
+                        .matchedGeometryEffect(id: "activeTrack", in: namespace)
+                }
+            }
         )
         .padding(.horizontal, 8)
+        // Smooth spring animation when becoming active/inactive
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isActive)
     }
 
     // MARK: - Theme-adaptive colors
