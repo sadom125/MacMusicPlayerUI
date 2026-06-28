@@ -16,7 +16,7 @@ struct LyricsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 12) {
+                VStack(spacing: 12) {
                     Color.clear.frame(height: 100)
 
                     ForEach(Array(lyrics.enumerated()), id: \.element.id) { index, line in
@@ -28,8 +28,7 @@ struct LyricsView: View {
                             isPlaying: isPlaying,
                             isDarkMode: themeManager.isDarkMode
                         )
-                        .equatable()
-                        .id(index)
+                        .id(line.id)
                         .frame(maxWidth: .infinity)
                     }
 
@@ -51,13 +50,13 @@ struct LyricsView: View {
             // Scroll to initial position when view first appears (safety net for
             // track changes where .onChange doesn't fire for the initial value).
             .onAppear {
-                if currentLineIndex >= 0 {
+                if currentLineIndex >= 0 && currentLineIndex < lyrics.count {
                     lastScrollLineIndex = currentLineIndex
-                    proxy.scrollTo(currentLineIndex, anchor: .center)
+                    proxy.scrollTo(lyrics[currentLineIndex].id, anchor: .center)
                 }
             }
             .onChange(of: currentLineIndex) { newIndex in
-                guard newIndex >= 0 else { return }
+                guard newIndex >= 0, newIndex < lyrics.count else { return }
                 let prev = lastScrollLineIndex >= 0 ? lastScrollLineIndex : newIndex
                 lastScrollLineIndex = newIndex
 
@@ -65,10 +64,10 @@ struct LyricsView: View {
                 // manual seek) scroll immediately to avoid long animation churn.
                 if abs(newIndex - prev) <= 3 {
                     withAnimation(.easeOut(duration: 0.08)) {
-                        proxy.scrollTo(newIndex, anchor: .center)
+                        proxy.scrollTo(lyrics[newIndex].id, anchor: .center)
                     }
                 } else {
-                    proxy.scrollTo(newIndex, anchor: .center)
+                    proxy.scrollTo(lyrics[newIndex].id, anchor: .center)
                 }
             }
         }

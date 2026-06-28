@@ -173,10 +173,6 @@ struct MainPlayerView: View {
                 showPlaylist: showPlaylist,
                 player: player
             )
-            // Force-rebuild on track change so NowPlayingView loads fresh lyrics
-            // in .onAppear. Without this, the @ViewBuilder switch preserves the
-            // old view identity and lyrics data doesn't propagate reliably.
-            .id(player.currentTrack?.id ?? UUID())
         }
     }
 

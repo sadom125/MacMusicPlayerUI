@@ -349,11 +349,14 @@ class PlayerManager: NSObject, ObservableObject {
             // Eagerly parse first 15 tracks' artwork & lyrics synchronously
             // so the playlist panel shows covers/artist immediately at launch
             // instead of waiting for N async tasks to trickle in.
+            // `parseLyricsSync` uses ffprobe fallback for FLAC files where
+            // the Vorbis comment may use lowercase `lyrics=` or lie beyond
+            // the first 512 KB (large embedded cover art).
             let eagerBatchSize = min(15, newPlaylist.count)
             for i in 0..<eagerBatchSize {
                 var track = newPlaylist[i]
                 let artwork = MetadataParser.parseArtworkDirect(from: track.url)
-                let lyrics = MetadataParser.parseLyricsDirect(from: track.url)
+                let lyrics = MetadataParser.parseLyricsSyncHeavy(from: track.url)
                 if artwork != nil || lyrics != nil {
                     track = Track(
                         id: track.id,

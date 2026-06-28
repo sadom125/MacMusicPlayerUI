@@ -297,14 +297,20 @@ struct MetadataParser {
         )
     }
 
-    /// Extract embedded lyrics using ffmpeg for formats AVAsset can't read (DFF/DSF/DSD).
+    /// Extract embedded lyrics using ffmpeg/ffprobe.
+    /// Works for ALL formats — AVAsset can't reliably read FLAC Vorbis comments
+    /// synchronously, and `parseLyricsDirect` only covers the first ~2 MB of a file.
+    /// ⚠️ Runs a subprocess — only call from BACKGROUND queues, NOT the main thread.
     private static func extractLyricsViaFFmpeg(url: URL) -> String? {
-        let ext = url.pathExtension.lowercased()
-        guard ext == "dff" || ext == "dsf" else { return nil }
-
+        // Use ffprobe — faster than ffmpeg for metadata-only extraction
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg")
-        process.arguments = ["-i", url.path, "-f", "ffmetadata", "-"]
+        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffprobe")
+        process.arguments = [
+            "-v", "quiet",
+            "-show_entries", "format_tags=LYRICS,lyrics",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            url.path
+        ]
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
@@ -319,17 +325,14 @@ struct MetadataParser {
         guard process.terminationStatus == 0 else { return nil }
         guard let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) else { return nil }
 
-        // Look for LYRICS= tag in ffmpeg metadata output
-        for line in output.components(separatedBy: .newlines) {
-            if line.hasPrefix("LYRICS=") {
-                let lyrics = String(line.dropFirst("LYRICS=".count))
-                return lyrics.isEmpty ? nil : lyrics
-            }
-        }
-        return nil
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     /// Synchronously read LYRICS tag from a FLAC file by scanning raw Vorbis comments.
+    /// Supports both `LYRICS=` and `lyrics=` (Vorbis comment field names are case-insensitive).
+    /// If not found in the first 512 KB, reads from the end of the Vorbis comment block
+    /// in case the embedded cover art pushes the Vorbis comments past the initial read window.
     /// Used as a direct fallback when async AVAsset metadata is not yet available.
     static func parseLyricsDirect(from url: URL) -> String? {
         guard url.pathExtension.lowercased() == "flac" else { return nil }
@@ -340,37 +343,81 @@ struct MetadataParser {
         let readSize = min(1024 * 512, size)
         guard let data = try? fileHandle.read(upToCount: readSize), data.count > 42 else { return nil }
 
-        // Search for "LYRICS=" in raw bytes (Vorbis comment stores as field=value)
-        let pattern = "LYRICS=".data(using: .utf8)!
-        var searchStart = 0
-        while searchStart <= data.count - pattern.count {
-            if data[searchStart..<searchStart + pattern.count] == pattern {
-                let start = searchStart + pattern.count
-                var end = start
-                while end < data.count, data[end] != 0 {
-                    end += 1
+        // Search for both uppercase and lowercase "LYRICS=" in raw bytes
+        // Vorbis comment field names are case-insensitive
+        let patterns = ["LYRICS=".data(using: .utf8)!, "lyrics=".data(using: .utf8)!]
+        for pattern in patterns {
+            var searchStart = 0
+            while searchStart <= data.count - pattern.count {
+                if data[searchStart..<searchStart + pattern.count] == pattern {
+                    let start = searchStart + pattern.count
+                    var end = start
+                    while end < data.count, data[end] != 0 {
+                        end += 1
+                    }
+                    if end > start {
+                        let result = String(data: data[start..<end], encoding: .utf8)
+                        if result != nil { return result }
+                    }
                 }
-                if end > start {
-                    return String(data: data[start..<end], encoding: .utf8)
+                searchStart += 1
+            }
+        }
+
+        // Not found in first 512 KB — try reading a larger portion.
+        // Some FLAC files with large embedded cover art (METADATA_BLOCK_PICTURE)
+        // have Vorbis comments past the 512 KB mark.
+        if size > 1024 * 1024 {
+            try? fileHandle.seek(toOffset: 0)
+            let largerReadSize = min(1024 * 1024 * 2, size) // up to 2 MB
+            if let largerData = try? fileHandle.read(upToCount: largerReadSize), largerData.count > 512 * 1024 {
+                for pattern in patterns {
+                    var searchStart = 0
+                    while searchStart <= largerData.count - pattern.count {
+                        if largerData[searchStart..<searchStart + pattern.count] == pattern {
+                            let start = searchStart + pattern.count
+                            var end = start
+                            while end < largerData.count, largerData[end] != 0 {
+                                end += 1
+                            }
+                            if end > start {
+                                let result = String(data: largerData[start..<end], encoding: .utf8)
+                                if result != nil { return result }
+                            }
+                        }
+                        searchStart += 1
+                    }
                 }
             }
-            searchStart += 1
         }
+
         return nil
     }
 
     /// Synchronously read lyrics from any audio format.
-    /// Tries FLAC direct scan → AVAsset synchronous metadata → ffmpeg.
+    /// Tries FLAC direct scan → AVAsset synchronous metadata.
+    /// ⚠️ Main-thread safe: no ffprobe subprocess.
+    /// For ffprobe fallback use `parseLyricsSyncHeavy(from:)` (background only).
     static func parseLyricsSync(from url: URL) -> String? {
-        // 1. FLAC direct byte scan (fast)
+        // 1. FLAC direct byte scan (fast, ~ms)
         if let lyrics = parseLyricsDirect(from: url) { return lyrics }
 
-        // 2. Synchronous AVAsset metadata (works for MP3/M4A/AAC/WAV etc.)
+        // 2. Synchronous AVAsset metadata (may return empty for FLAC Vorbis comments,
+        //    but works for MP3/M4A/AAC/WAV etc.)
         let asset = AVAsset(url: url)
-        let metadata = asset.metadata  // synchronous API, available on macOS 10.x+
+        let metadata = asset.metadata
         if let lyrics = findLyrics(metadata: metadata) { return lyrics }
 
-        // 3. ffmpeg fallback (DSD files etc.)
+        return nil
+    }
+
+    /// Synchronously read lyrics with ffprobe subprocess fallback.
+    /// ⚠️ Only call from BACKGROUND queues — ffprobe is a subprocess (~50-200ms).
+    static func parseLyricsSyncHeavy(from url: URL) -> String? {
+        // 1. Fast path (direct scan + AVAsset sync metadata)
+        if let lyrics = parseLyricsSync(from: url) { return lyrics }
+        // 2. ffprobe fallback — handles FLAC Vorbis comments in any case,
+        //    beyond 2 MB, and exotic audio formats
         return extractLyricsViaFFmpeg(url: url)
     }
 

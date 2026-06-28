@@ -66,6 +66,11 @@ struct NowPlayingView: View {
         .onAppear {
             loadLyrics()
         }
+        // 切歌时重新加载歌词（替代之前的 .id() 方案——.id() 会破坏
+        // @ObservedObject timeManager 的订阅，导致逐字动画/律动长时间不渲染）
+        .onChange(of: player.currentTrack?.id) { _ in
+            loadLyrics()
+        }
         // 编辑元数据后重新加载歌词
         .onReceive(NotificationCenter.default.publisher(for: .currentTrackMetadataUpdated)) { _ in
             loadLyrics()
