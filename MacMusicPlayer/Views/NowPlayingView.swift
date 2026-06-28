@@ -100,8 +100,8 @@ struct NowPlayingView: View {
             }
         }
 
-        // 2b. Direct synchronous scan
-        if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
+        // 2b. Synchronous scan — works for FLAC, MP3, M4A, and more
+        if let lrcText = MetadataParser.parseLyricsSync(from: track.url), !lrcText.isEmpty {
             let parsed = LrcParser.parse(lrcText: lrcText)
             if !parsed.isEmpty {
                 displayedLyrics = LrcParser.assignWordsToLines(parsed)

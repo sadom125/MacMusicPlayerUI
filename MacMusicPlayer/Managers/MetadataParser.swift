@@ -359,6 +359,21 @@ struct MetadataParser {
         return nil
     }
 
+    /// Synchronously read lyrics from any audio format.
+    /// Tries FLAC direct scan → AVAsset synchronous metadata → ffmpeg.
+    static func parseLyricsSync(from url: URL) -> String? {
+        // 1. FLAC direct byte scan (fast)
+        if let lyrics = parseLyricsDirect(from: url) { return lyrics }
+
+        // 2. Synchronous AVAsset metadata (works for MP3/M4A/AAC/WAV etc.)
+        let asset = AVAsset(url: url)
+        let metadata = asset.metadata  // synchronous API, available on macOS 10.x+
+        if let lyrics = findLyrics(metadata: metadata) { return lyrics }
+
+        // 3. ffmpeg fallback (DSD files etc.)
+        return extractLyricsViaFFmpeg(url: url)
+    }
+
     /// Synchronously read album art (METADATA_BLOCK_PICTURE) from a FLAC file.
     /// Used as a direct fallback when async AVAsset metadata is not yet available.
     static func parseArtworkDirect(from url: URL) -> Data? {
