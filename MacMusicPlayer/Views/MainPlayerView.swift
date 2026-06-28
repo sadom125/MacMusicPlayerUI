@@ -9,7 +9,13 @@ struct MainPlayerView: View {
     @State private var lastLyricIndex: Int = -1
     /// Throttle lyric index updates to once per second instead of every 100ms
     @State private var lastLyricUpdateSecond: Int = -1
-    @State private var artworkFallbackCache: [UUID: Data?] = [:]
+
+    /// Thread-safe artwork cache that auto-evicts under memory pressure.
+    private let artworkCache: NSCache<NSString, NSData> = {
+        let cache = NSCache<NSString, NSData>()
+        cache.countLimit = 50
+        return cache
+    }()
     @AppStorage("bgMode") private var bgMode: String = "albumArt"
     @AppStorage("showPlaylist") private var showPlaylist: Bool = false
     @AppStorage("viewMode") private var viewMode: String = "nowPlaying"
@@ -33,9 +39,11 @@ struct MainPlayerView: View {
     private var currentArtworkData: Data? {
         guard let track = player.currentTrack else { return nil }
         if let data = track.albumArtData { return data }
-        if let cached = artworkFallbackCache[track.id] { return cached }
+        // Check NSCache (auto-evicts under memory pressure, count limit 50)
+        let key = track.id.uuidString as NSString
+        if let cached = artworkCache.object(forKey: key) { return cached as Data }
         let data = MetadataParser.parseArtworkDirect(from: track.url)
-        artworkFallbackCache[track.id] = data
+        if let data = data { artworkCache.setObject(data as NSData, forKey: key) }
         return data
     }
 
@@ -114,6 +122,7 @@ struct MainPlayerView: View {
             .padding(.vertical, 20)
             .shadow(color: .black.opacity(0.25), radius: 20, x: -5, y: 0)
             .offset(x: showPlaylist ? 0 : 340)
+            .rotation3DEffect(.degrees(showPlaylist ? 0 : 12), axis: (0, 1, 0), anchor: .leading, perspective: 0.4)
             .animation(.spring(response: 0.45, dampingFraction: 0.82), value: showPlaylist)
         }
         .onHover { hovering in

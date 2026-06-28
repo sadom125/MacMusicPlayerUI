@@ -17,6 +17,10 @@ struct NowPlayingView: View {
     /// 播放时的旋转起始时间，用于「暂停→恢复」时无缝衔接角度
     @State private var rotationStartTime: Date = Date()
 
+    /// 3D 倾斜角度 — 鼠标相对窗口位置驱动的弹簧动画
+    @State private var tiltX: Double = 0
+    @State private var tiltY: Double = 0
+
     private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.3) : Color.black.opacity(0.3) }
     private var placeholderBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.1) : Color.black.opacity(0.08) }
 
@@ -50,6 +54,20 @@ struct NowPlayingView: View {
                 rotationStartTime = Date().addingTimeInterval(-elapsedSec)
             }
         }
+        // macOS 12 compat: NSTrackingArea overlay tracks mouse position for 3D tilt
+        .background(HoverPositionReporter(onHover: { location in
+            if let loc = location {
+                // Map mouse position to subtle 3D tilt (±3°)
+                let centerX: CGFloat = 200
+                let centerY: CGFloat = 160
+                tiltY = Double((loc.x - centerX) / centerX) * 3.0
+                tiltX = Double((loc.y - centerY) / centerY) * 3.0
+            } else {
+                // Spring animation smoothly returns to neutral
+                tiltX = 0
+                tiltY = 0
+            }
+        }))
     }
 
     // MARK: - Vinyl Record
@@ -62,11 +80,12 @@ struct NowPlayingView: View {
                 .frame(width: 320, height: 320)
                 .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 10)
 
-            // Vinyl grooves
+            // Vinyl grooves — subtle parallax offset for depth
             ForEach(0..<5) { i in
                 Circle()
                     .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
                     .frame(width: CGFloat(280 - i * 20), height: CGFloat(280 - i * 20))
+                    .offset(x: CGFloat(i) * 0.5, y: 0)  // micro-offset for depth
             }
 
             // Album art (center disc, rotating via TimelineView)
@@ -74,7 +93,9 @@ struct NowPlayingView: View {
             // stays at the last angle instead of snapping back to 0°.
             if let data = artworkData, let nsImage = NSImage(data: data) {
                 if isPlaying {
-                    TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { context in
+                    // 20fps is sufficient for a smooth disc rotation —
+                    // saves ~33% CPU vs 30fps with no visible difference.
+                    TimelineView(.periodic(from: .now, by: 1.0 / 20.0)) { context in
                         let elapsed = context.date.timeIntervalSince(self.rotationStartTime)
                         let angle = (elapsed.truncatingRemainder(dividingBy: 8.0) / 8.0) * 360.0
 
@@ -120,6 +141,12 @@ struct NowPlayingView: View {
                 .fill(Color.white.opacity(0.3))
                 .frame(width: 4, height: 4)
         }
+        // 3D perspective tilt — follows mouse position for a subtle depth effect.
+        // The disc tilts like a real record on a turntable when you change angle.
+        .rotation3DEffect(.degrees(-tiltX), axis: (1, 0, 0), anchor: .center, perspective: 0.5)
+        .rotation3DEffect(.degrees(tiltY), axis: (0, 1, 0), anchor: .center, perspective: 0.5)
+        .animation(.interactiveSpring(response: 0.15, dampingFraction: 0.7), value: tiltX)
+        .animation(.interactiveSpring(response: 0.15, dampingFraction: 0.7), value: tiltY)
     }
 
     private var lyricsSection: some View {
@@ -210,5 +237,56 @@ struct MusicRhythmView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Hover Position Tracker (macOS 12+)
+
+/// NSViewRepresentable that sets up an NSTrackingArea to report mouse position.
+/// Used for driving 3D tilt effects on the vinyl record.
+struct HoverPositionReporter: NSViewRepresentable {
+    let onHover: (CGPoint?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = TrackingNSView()
+        view.onHover = onHover
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let trackingView = nsView as? TrackingNSView {
+            trackingView.onHover = onHover
+            trackingView.updateTrackingAreas()
+        }
+    }
+}
+
+fileprivate class TrackingNSView: NSView {
+    var onHover: ((CGPoint?) -> Void)?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        // Remove old tracking areas
+        trackingAreas.forEach { removeTrackingArea($0) }
+
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .activeInActiveApp, .inVisibleRect, .mouseEnteredAndExited],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        onHover?(convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onHover?(convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHover?(nil)
     }
 }

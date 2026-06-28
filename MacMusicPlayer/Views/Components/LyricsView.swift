@@ -85,15 +85,38 @@ struct LyricLineView: View {
 
     var body: some View {
         // Use word-level highlighting if words are available, otherwise fall back to line-level
-        if isActive && !line.words.isEmpty {
-            wordHighlightedText
-        } else {
-            Text(line.text)
-                .font(isActive ? .system(size: 22, weight: .semibold) : .system(size: 16))
-                .foregroundColor(foreground)
-                .lineSpacing(12)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
+        let rotation = depthRotation
+        return Group {
+            if isActive && !line.words.isEmpty {
+                wordHighlightedText
+                    .rotation3DEffect(.degrees(0), axis: (0, 1, 0))
+            } else {
+                Text(line.text)
+                    .font(isActive ? .system(size: 22, weight: .semibold) : .system(size: 16))
+                    .foregroundColor(foreground)
+                    .lineSpacing(12)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+            }
+        }
+        .rotation3DEffect(.degrees(rotation.y), axis: (0, 1, 0), anchor: .center, perspective: 0.2)
+        .rotation3DEffect(.degrees(-rotation.x), axis: (1, 0, 0), anchor: .center, perspective: 0.2)
+        .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.8), value: proximity)
+    }
+    // MARK: - 3D Depth Transform
+
+    /// Subtle 3D rotation per line based on proximity:
+    /// - Active line: no rotation (front and center)
+    /// - Near lines: slight Y rotation, like lines on a curved surface
+    /// - Far lines: more rotation, creating depth
+    private var depthRotation: (x: Double, y: Double) {
+        switch proximity {
+        case .active:
+            return (0, 0)
+        case .near:
+            return (1.5, 2.0)
+        case .far:
+            return (3.0, 4.0)
         }
     }
 

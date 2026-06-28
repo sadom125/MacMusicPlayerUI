@@ -55,6 +55,7 @@ struct CompactControlBar: View {
         .offset(y: isVisible ? 0 : 100)
         .opacity(isVisible ? 1 : 0)
         .scaleEffect(isVisible ? 1 : 0.95, anchor: .bottom)
+        .rotation3DEffect(.degrees(isVisible ? 0 : 8), axis: (1, 0, 0), anchor: .bottom, perspective: 0.3)
     }
 
     // MARK: - Top Row (Track Info + Actions)
