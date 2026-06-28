@@ -186,17 +186,26 @@ class PlayerManager: NSObject, ObservableObject {
             guard self.isPlaying, !self.isInBackground else { return }
 
             let secs = CMTimeGetSeconds(time)
-            self.currentTime = secs.isFinite ? secs : 0
+            let safeTime = secs.isFinite ? secs : 0
+            self.currentTime = safeTime
             TimeManager.shared.currentTime = self.currentTime
 
-            // Always read real duration from AVPlayer (most accurate)
+            // Read duration from AVPlayer (most accurate). Some audio files
+            // (VBR MP3, FLAC) report an inaccurate duration — if we've played
+            // past the stored duration, correct it.
             if let playerDuration = self.queueController.currentItemDuration,
                playerDuration > 0, playerDuration.isFinite {
-                if abs(self.duration - playerDuration) > 0.5 {
-                    self.duration = playerDuration
+                let corrected = max(playerDuration, safeTime)
+                if abs(self.duration - corrected) > 0.5 {
+                    self.duration = corrected
                     TimeManager.shared.duration = self.duration
-                    self.syncDurationToCurrentTrack(playerDuration)
+                    self.syncDurationToCurrentTrack(corrected)
                 }
+            } else if self.duration > 0 && safeTime > self.duration {
+                // No AVPlayer duration available but playback passed it —
+                // use the actual observed time as the real duration.
+                self.duration = safeTime
+                TimeManager.shared.duration = self.duration
             }
         }
     }
@@ -888,12 +897,20 @@ class PlayerManager: NSObject, ObservableObject {
                 let finishedIndex = playlistStore.tracks.firstIndex(where: { $0.id == finishedTrack.id })
             else { return }
 
+            let nextIndex: Int
             if finishedIndex == playlistStore.count - 1 {
-                let nextIndex = (finishedIndex + 1) % playlistStore.count
-                queueController.setQueue(playlistStore.tracks, startingAt: nextIndex)
-                queueController.play()
-                updateNowPlayingInfo()
+                nextIndex = 0
+            } else {
+                nextIndex = finishedIndex + 1
             }
+
+            queueController.setQueue(playlistStore.tracks, startingAt: nextIndex)
+            playlistStore.setCurrentIndex(nextIndex)
+            currentIndex = nextIndex
+            currentTrack = playlistStore.currentTrack
+            if let t = currentTrack { duration = t.duration }
+            queueController.play()
+            updateNowPlayingInfo()
 
         case .singleLoop:
             guard

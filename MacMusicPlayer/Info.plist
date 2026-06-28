@@ -39,8 +39,8 @@
         <string>identifier "com.seimotech.MacMusicPlayer" and anchor apple generic</string>
     </dict>
     <key>CFBundleShortVersionString</key>
-    <string>2.0.3</string>
+    <string>2.0.4</string>
     <key>CFBundleVersion</key>
-    <string>3</string>
+    <string>13</string>
 </dict>
 </plist>

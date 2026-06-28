@@ -3,23 +3,41 @@ import SwiftUI
 /// Now Playing view with horizontal layout: vinyl record left, lyrics right.
 struct NowPlayingView: View {
     let artworkData: Data?
-    let lyrics: [LyricLine]
-    let currentLineIndex: Int
     var isPlaying: Bool = false
     var showRhythm: Bool = false
     var showPlaylist: Bool = false  // 控制歌词偏移
 
-    /// Observe TimeManager directly so this view's body re-evaluates for
-    /// time changes without triggering parent (MainPlayerView) or sibling
-    /// (CompactControlBar) re-evaluation.
+    @ObservedObject var player: PlayerManager
     @ObservedObject var timeManager = TimeManager.shared
-
     @ObservedObject var themeManager = ThemeManager.shared
+
+    /// 当前歌词数据 — 在 NowPlayingView 内部管理，不依赖父视图传递
+    @State private var displayedLyrics: [LyricLine] = []
 
     /// 自动 3D 摆动相位 — 用 SwiftUI .repeatForever 驱动，零额外 CPU
     /// 两个独立相位制造 Lissajous 式旋转，感觉像真实唱片在转盘上微微晃动
     @State private var discTiltPhaseX: Bool = false
     @State private var discTiltPhaseY: Bool = false
+
+    /// 当前播放时间对应的歌词行索引 — 用于 LyricsView 定位和高亮。
+    private var currentLineIndex: Int {
+        let time = timeManager.currentTime
+        guard time >= 0, !displayedLyrics.isEmpty else { return -1 }
+        // 二分查找最后一个 time <= currentTime 的行
+        var lo = 0
+        var hi = displayedLyrics.count - 1
+        var result = -1
+        while lo <= hi {
+            let mid = (lo + hi) / 2
+            if displayedLyrics[mid].time <= time {
+                result = mid
+                lo = mid + 1
+            } else {
+                hi = mid - 1
+            }
+        }
+        return result
+    }
 
     private var tertiaryText: Color { themeManager.isDarkMode ? Color.white.opacity(0.3) : Color.black.opacity(0.3) }
     private var placeholderBg: Color { themeManager.isDarkMode ? Color.white.opacity(0.1) : Color.black.opacity(0.08) }
@@ -45,7 +63,65 @@ struct NowPlayingView: View {
         .padding(.leading, 80)
         .padding(.trailing, 40)
         .padding(.vertical, 40)
+        .onAppear {
+            loadLyrics()
+        }
+        // 编辑元数据后重新加载歌词
+        .onReceive(NotificationCenter.default.publisher(for: .currentTrackMetadataUpdated)) { _ in
+            loadLyrics()
+        }
 
+    }
+
+    // MARK: - Lyrics Loading
+
+    private func loadLyrics() {
+        guard let track = player.currentTrack else {
+            displayedLyrics = []
+            return
+        }
+
+        // 1. Try external .lrc file
+        let lrcURL = track.url.deletingPathExtension().appendingPathExtension("lrc")
+        if let lrcText = try? String(contentsOf: lrcURL, encoding: .utf8) {
+            let parsed = LrcParser.parse(lrcText: lrcText)
+            if !parsed.isEmpty {
+                displayedLyrics = LrcParser.assignWordsToLines(parsed)
+                return
+            }
+        }
+
+        // 2. Try embedded lyrics
+        if let lrcText = track.lyrics, !lrcText.isEmpty {
+            let parsed = LrcParser.parse(lrcText: lrcText)
+            if !parsed.isEmpty {
+                displayedLyrics = LrcParser.assignWordsToLines(parsed)
+                return
+            }
+        }
+
+        // 2b. Direct synchronous scan
+        if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
+            let parsed = LrcParser.parse(lrcText: lrcText)
+            if !parsed.isEmpty {
+                displayedLyrics = LrcParser.assignWordsToLines(parsed)
+                return
+            }
+        }
+
+        // 3. Fallback: show track info
+        var fallbackLines: [LyricLine] = []
+        fallbackLines.append(LyricLine(time: 0, text: track.title))
+        if !track.artist.isEmpty, track.artist != NSLocalizedString("Unknown Artist", comment: "") {
+            fallbackLines.append(LyricLine(time: 0, text: track.artist))
+        }
+        if !track.album.isEmpty, track.album != NSLocalizedString("Unknown Album", comment: "") {
+            fallbackLines.append(LyricLine(time: 0, text: track.album))
+        }
+        if fallbackLines.isEmpty {
+            fallbackLines.append(LyricLine(time: 0, text: track.title))
+        }
+        displayedLyrics = fallbackLines
     }
 
     // MARK: - Vinyl Record
@@ -84,8 +160,8 @@ struct NowPlayingView: View {
     private var lyricsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Lyrics
-            if !lyrics.isEmpty {
-                LyricsView(lyrics: lyrics, currentLineIndex: currentLineIndex, currentTime: timeManager.currentTime, isPlaying: isPlaying)
+            if !displayedLyrics.isEmpty {
+                LyricsView(lyrics: displayedLyrics, currentLineIndex: currentLineIndex, currentTime: timeManager.currentTime, isPlaying: isPlaying)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // No lyrics placeholder

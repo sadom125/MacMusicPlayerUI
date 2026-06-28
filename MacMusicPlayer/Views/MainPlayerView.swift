@@ -5,8 +5,6 @@ import SwiftUI
 struct MainPlayerView: View {
     @ObservedObject var player: PlayerManager
     @ObservedObject var themeManager = ThemeManager.shared
-    @State private var lyrics: [LyricLine] = []
-    @State private var lastLyricIndex: Int = -1
 
     /// Thread-safe artwork cache that auto-evicts under memory pressure.
     private let artworkCache: NSCache<NSString, NSData> = {
@@ -27,11 +25,7 @@ struct MainPlayerView: View {
     /// 控制栏有未完成的操作时锁定，禁止自动隐藏（分享弹窗、下拉菜单等）
     @State private var controlsLocked: Bool = false
 
-    /// Text of the currently highlighted lyric line, for share screenshot.
-    private var currentLyricText: String {
-        guard lastLyricIndex >= 0, lastLyricIndex < lyrics.count else { return "" }
-        return lyrics[lastLyricIndex].text
-    }
+    /* currentLyricText removed — LyricsView computes index internally now */
 
     /// Artwork from Track model, falling back to synchronous FLAC scan.
     private var currentArtworkData: Data? {
@@ -80,7 +74,7 @@ struct MainPlayerView: View {
                             }
                         },
                         showRhythm: $showRhythm,
-                        currentLyricLine: currentLyricText,
+                        currentLyricLine: "",
                         controlsLocked: $controlsLocked
                     )
                     Spacer()
@@ -152,34 +146,11 @@ struct MainPlayerView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: work)
             }
         }
-        .onAppear {
-            loadLyrics()
-            // Listen for async metadata completion to reload lyrics
-            NotificationCenter.default.addObserver(
-                forName: .currentTrackMetadataUpdated,
-                object: nil,
-                queue: .main
-            ) { _ in
-                self.loadLyrics()
-            }
-        }
-        .onDisappear {
-            NotificationCenter.default.removeObserver(self)
-        }
         .onChange(of: player.currentTrack) { _ in
-            loadLyrics()
             ensureCurrentTrackMetadata()
             if let window = NSApplication.shared.keyWindow as? MainPlayerWindow {
                 window.updateTitle()
             }
-        }
-        // Observe TimeManager directly (not player.currentTime) so only
-        // this closure fires every 1s instead of triggering a full body
-        // re-evaluation of every PlayerManager-observing view.
-        .onReceive(TimeManager.shared.$currentTime) { newTime in
-            // Update lyric index every 250ms (matches time observer interval).
-            // Binary search is O(log n), so this is negligible CPU cost.
-            updateLyricIndex(time: newTime)
         }
     }
 
@@ -197,16 +168,15 @@ struct MainPlayerView: View {
         default:
             NowPlayingView(
                 artworkData: currentArtworkData,
-                lyrics: lyrics,
-                currentLineIndex: lastLyricIndex,
                 isPlaying: player.isPlaying,
                 showRhythm: showRhythm,
-                showPlaylist: showPlaylist
+                showPlaylist: showPlaylist,
+                player: player
             )
-            // NOTE: No .id() on NowPlayingView! SwiftUI's natural prop diffing handles
-            // lyrics refresh correctly — ForEach(id: \.element.id) in LyricsView sees new
-            // UUIDs on track change and rebuilds rows. An .id() would destroy the ScrollView
-            // state, causing lyrics scroll position loss (the "position offset" bug).
+            // Force-rebuild on track change so NowPlayingView loads fresh lyrics
+            // in .onAppear. Without this, the @ViewBuilder switch preserves the
+            // old view identity and lyrics data doesn't propagate reliably.
+            .id(player.currentTrack?.id ?? UUID())
         }
     }
 
@@ -283,93 +253,6 @@ struct MainPlayerView: View {
             await MainActor.run {
                 self.player.updateTrackFromUI(track, with: meta)
             }
-        }
-    }
-
-    // MARK: - Lyrics Loading
-
-    private func loadLyrics() {
-        // Reset BEFORE loading new lyrics to avoid showing old lyrics/index
-        // during the brief window between track change and lyrics parsing.
-        lastLyricIndex = -1
-
-        guard let track = player.currentTrack else {
-            lyrics = []
-            return
-        }
-
-        // 1. Try external .lrc file
-        let lrcURL = track.url.deletingPathExtension().appendingPathExtension("lrc")
-        if let lrcText = try? String(contentsOf: lrcURL, encoding: .utf8) {
-            let parsed = LrcParser.parse(lrcText: lrcText)
-            if !parsed.isEmpty {
-                lyrics = LrcParser.assignWordsToLines(parsed)
-                updateLyricIndex(time: player.currentTime)
-                return
-            }
-        }
-
-        // 2. Try embedded lyrics
-        if let lrcText = track.lyrics, !lrcText.isEmpty {
-            let parsed = LrcParser.parse(lrcText: lrcText)
-            if !parsed.isEmpty {
-                lyrics = LrcParser.assignWordsToLines(parsed)
-                updateLyricIndex(time: player.currentTime)
-                return
-            }
-        }
-
-        // 2b. Direct synchronous scan
-        if let lrcText = MetadataParser.parseLyricsDirect(from: track.url), !lrcText.isEmpty {
-            let parsed = LrcParser.parse(lrcText: lrcText)
-            if !parsed.isEmpty {
-                lyrics = LrcParser.assignWordsToLines(parsed)
-                updateLyricIndex(time: player.currentTime)
-                return
-            }
-        }
-
-        // 3. Fallback: show track info
-        var fallbackLines: [LyricLine] = []
-        fallbackLines.append(LyricLine(time: 0, text: track.title))
-        if !track.artist.isEmpty, track.artist != NSLocalizedString("Unknown Artist", comment: "") {
-            fallbackLines.append(LyricLine(time: 0, text: track.artist))
-        }
-        if !track.album.isEmpty, track.album != NSLocalizedString("Unknown Album", comment: "") {
-            fallbackLines.append(LyricLine(time: 0, text: track.album))
-        }
-        if fallbackLines.isEmpty {
-            fallbackLines.append(LyricLine(time: 0, text: track.title))
-        }
-        lyrics = fallbackLines
-        updateLyricIndex(time: player.currentTime)
-    }
-
-    private func updateLyricIndex(time: TimeInterval) {
-        guard !lyrics.isEmpty else {
-            lastLyricIndex = -1
-            return
-        }
-        // Guard against stale lastLyricIndex when lyrics array shrinks (e.g. track change)
-        if lastLyricIndex >= lyrics.count { lastLyricIndex = -1 }
-
-        // Binary search: find the last lyric line whose time <= current time
-        // lyrics are sorted by time (LrcParser sorts them), so O(log n) instead of O(n)
-        var lo = 0
-        var hi = lyrics.count - 1
-        var idx = -1
-        while lo <= hi {
-            let mid = (lo + hi) / 2
-            if lyrics[mid].time <= time {
-                idx = mid
-                lo = mid + 1
-            } else {
-                hi = mid - 1
-            }
-        }
-
-        if idx != lastLyricIndex {
-            lastLyricIndex = idx
         }
     }
 
