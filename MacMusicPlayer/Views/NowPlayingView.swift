@@ -45,28 +45,13 @@ struct NowPlayingView: View {
         .padding(.leading, 80)
         .padding(.trailing, 40)
         .padding(.vertical, 40)
-        .onAppear {
-            // Start auto 3D tilt oscillation — no NSTrackingArea needed,
-            // no CPU overhead, purely GPU-driven animation.
-            withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) {
-                discTiltPhaseX = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.875) {
-                withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
-                    discTiltPhaseY = true
-                }
-            }
-        }
+
     }
 
     // MARK: - Vinyl Record
 
     private var vinylSection: some View {
-        // Auto-oscillating tilt derived from SwiftUI animation phases.
-        // Map: false→-4°, true→+4° for a smooth ±4° sway on each axis.
-        let tiltX: Double = (discTiltPhaseX ? 4.0 : -4.0)
-        let tiltY: Double = (discTiltPhaseY ? 3.0 : -3.0)
-        return ZStack {
+        ZStack {
             // Outer disc (black vinyl)
             Circle()
                 .fill(Color.black)
@@ -144,7 +129,7 @@ private struct RotatingArtView: View {
 
     @State private var rotationAngle: Double = 0
     @State private var cachedImage: NSImage?
-    private let timer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
+    private let timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Group {

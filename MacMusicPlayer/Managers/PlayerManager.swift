@@ -177,22 +177,24 @@ class PlayerManager: NSObject, ObservableObject {
     }
 
     private func setupTimeObserver() {
-        // 1s interval — 250ms was overkill for UI refresh rate.
-        // Time updates still happen via the 20fps TimelineView for visuals.
-        // We skip updates when paused to avoid unnecessary SwiftUI re-renders.
-        let interval = CMTime(seconds: 1.0, preferredTimescale: 10)
+        // 0.25s interval — balanced for smooth progress/lyrics with low CPU.
+        // Also updates TimeManager so NowPlayingView can observe time without
+        // triggering parent (MainPlayerView) body re-evaluation.
+        let interval = CMTime(seconds: 0.25, preferredTimescale: 40)
         timeObserver = queueController.queuePlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self else { return }
             guard self.isPlaying, !self.isInBackground else { return }
 
             let secs = CMTimeGetSeconds(time)
             self.currentTime = secs.isFinite ? secs : 0
+            TimeManager.shared.currentTime = self.currentTime
 
             // Always read real duration from AVPlayer (most accurate)
             if let playerDuration = self.queueController.currentItemDuration,
                playerDuration > 0, playerDuration.isFinite {
                 if abs(self.duration - playerDuration) > 0.5 {
                     self.duration = playerDuration
+                    TimeManager.shared.duration = self.duration
                     self.syncDurationToCurrentTrack(playerDuration)
                 }
             }
